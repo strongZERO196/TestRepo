@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>テトリス</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="left">
+        <canvas id="board" width="300" height="600" aria-label="ゲームボード" ></canvas>
+      </div>
+      <div class="right">
+        <h1>テトリス</h1>
+        <div class="panel">
+          <div class="row"><span>スコア</span><strong id="score">0</strong></div>
+          <div class="row"><span>ライン</span><strong id="lines">0</strong></div>
+          <div class="row"><span>レベル</span><strong id="level">1</strong></div>
+        </div>
+        <div class="panel">
+          <div class="row header">NEXT</div>
+          <canvas id="next" width="120" height="120" aria-label="次のピース"></canvas>
+        </div>
+        <div class="panel">
+          <div class="row header">操作</div>
+          <ul class="help">
+            <li>← →：移動</li>
+            <li>↓：ソフトドロップ</li>
+            <li>↑ / X：右回転</li>
+            <li>Z：左回転</li>
+            <li>Space：ハードドロップ</li>
+            <li>P：一時停止 / 再開</li>
+            <li>R：リセット</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <script src="main.js"></script>
+  </body>
+  </html>
+
