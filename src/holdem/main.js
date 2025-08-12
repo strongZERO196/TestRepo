@@ -374,8 +374,14 @@
       if (!p.folded) scores.set(p.id, best5Score([...p.hand, ...state.board]));
     }
     pots.forEach((pot, idx) => {
-      const elig = pot.eligible.filter(id => !players[id].folded);
+      const elig = pot.eligible.filter(id => !players[id].folded && !players[id].out);
       if (elig.length === 0 || pot.amount <= 0) return;
+      if (elig.length === 1) {
+        // 単独権利（未コール分など）は返還扱い
+        players[elig[0]].chips += pot.amount;
+        log(`ポット${idx+1}: 返還 ${players[elig[0]].name} / ${pot.amount}`);
+        return;
+      }
       let best = null; let winners = [];
       for (const id of elig) {
         const sc = scores.get(id);
