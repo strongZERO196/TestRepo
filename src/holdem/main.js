@@ -12,6 +12,7 @@
   const logEl = document.getElementById('log');
   const streetEl = document.getElementById('street');
   const turnEl = document.getElementById('turn');
+  const potsEl = document.getElementById('pots');
 
   const btnNew = document.getElementById('btn-new');
   const btnFold = document.getElementById('btn-fold');
@@ -127,6 +128,22 @@
       const st = $('state-' + p.id);
       st.textContent = p.out ? '離脱' : (p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : '')));
       if (state.street === 'idle') st.textContent = '';
+    }
+    // ポット内訳表示（メイン/サイド）
+    if (potsEl) {
+      potsEl.innerHTML = '';
+      if (state.street !== 'idle' && state.pot > 0) {
+        const pots = computePots();
+        pots.forEach((pot, idx) => {
+          const div = document.createElement('div');
+          const label = idx === 0 ? 'メイン' : `サイド${idx}`;
+          div.textContent = `${label}:${pot.amount}`;
+          div.style.background = 'rgba(0,0,0,0.25)';
+          div.style.padding = '2px 6px';
+          div.style.borderRadius = '8px';
+          potsEl.appendChild(div);
+        });
+      }
     }
     updateControls();
   }
@@ -376,10 +393,11 @@
     pots.forEach((pot, idx) => {
       const elig = pot.eligible.filter(id => !players[id].folded && !players[id].out);
       if (elig.length === 0 || pot.amount <= 0) return;
+      const potName = idx === 0 ? 'メインポット' : `サイドポット${idx}`;
       if (elig.length === 1) {
         // 単独権利（未コール分など）は返還扱い
         players[elig[0]].chips += pot.amount;
-        log(`ポット${idx+1}: 返還 ${players[elig[0]].name} / ${pot.amount}`);
+        log(`${potName}: 返還 ${players[elig[0]].name} / ${pot.amount}`);
         return;
       }
       let best = null; let winners = [];
@@ -392,7 +410,7 @@
       let remainder = pot.amount - share * winners.length;
       for (const id of winners) players[id].chips += share;
       if (remainder > 0) players[winners[0]].chips += remainder; // 余りは先頭へ（簡略）
-      log(`ポット${idx+1}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
+      log(`${potName}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
     });
     state.pot = 0;
     // チップが尽きたプレイヤーは離脱
