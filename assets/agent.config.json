@@ -1,0 +1,8 @@
+{
+  "language": "ja",
+  "preamble_locale": "ja",
+  "plan_updates_locale": "ja",
+  "default_tone": "concise",
+  "translate_external_output": true,
+  "notes": "Codex CLI や補助ツール向けのメタ設定。思考メモ/進捗更新は日本語で出力する方針を示します。"
+}

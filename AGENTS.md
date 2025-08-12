@@ -34,3 +34,10 @@
 ## セキュリティ／設定の注意
 - 機密情報（鍵・トークン・個人情報）はコミット禁止。必要なら `.env` 等でローカル管理し `.gitignore` に追加。
 - 設定ファイルはテンプレート（例：`assets/config.example.json`）を用意し、実値は各自の環境で複製。
+
+## エージェント設定（thinking の日本語化）
+- 既定言語：日本語（質問・回答・進捗更新・プレアンブル）。
+- 設定ファイル：`assets/agent.config.json`
+  - `language`/`preamble_locale`/`plan_updates_locale`：`"ja"` を維持。
+  - `translate_external_output`: 外部出力は必要に応じて日本語要約。
+- 補足：エージェント/ツール側が設定を読む場合に備えたメタ設定です。運用時は日本語でのやり取りを徹底してください。
