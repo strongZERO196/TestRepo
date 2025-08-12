@@ -14,6 +14,7 @@
   const turnEl = document.getElementById('turn');
   const potsEl = document.getElementById('pots');
   const showdownInfo = new Map(); // プレイヤーID -> { score, used: Card[] }
+  const boardHL = new Set(); // ボード上でハイライトするカード
 
   const btnNew = document.getElementById('btn-new');
   const btnFold = document.getElementById('btn-fold');
@@ -114,7 +115,12 @@
     turnEl.textContent = state.street === 'idle' ? '' : `次の行動: ${players[state.toAct]?.name ?? ''}`;
     // ボード
     boardEl.innerHTML = '';
-    state.board.forEach(c => boardEl.appendChild(cardEl(c, true)));
+    state.board.forEach(c => {
+      const el = cardEl(c, true);
+      if (state.street === 'showdown' && boardHL.has(c)) el.classList.add('hl');
+      el.classList.add('board-card');
+      boardEl.appendChild(el);
+    });
     // 各席
     for (const p of players) {
       $('chips-' + p.id).textContent = String(p.chips);
@@ -393,6 +399,7 @@
     const active = players.filter(p => !p.folded && !p.out);
     // 役を事前計算
     showdownInfo.clear();
+    boardHL.clear();
     for (const p of active) {
       const res = best5Detailed([...p.hand, ...state.board]);
       showdownInfo.set(p.id, res);
@@ -424,6 +431,11 @@
         const sc = scores.get(id);
         if (!best || compareScore(sc, best) > 0) { best = sc; winners = [id]; }
         else if (compareScore(sc, best) === 0) winners.push(id);
+      }
+      // 勝者の使用カードのうち、ボードにあるカードをハイライト対象に追加
+      for (const wid of winners) {
+        const used = showdownInfo.get(wid)?.used || [];
+        for (const card of used) if (state.board.includes(card)) boardHL.add(card);
       }
       const share = Math.floor(pot.amount / winners.length);
       let remainder = pot.amount - share * winners.length;

@@ -44,6 +44,7 @@ h1 { margin: 0 0 12px; font-size: 22px; }
   display: grid; place-items: center; font-weight: 700; border: 2px solid #222;
 }
 .card.hl { box-shadow: 0 0 0 3px #ffd24a, 0 0 12px #ffd24a; }
+.board .card.hl { box-shadow: 0 0 0 3px #ff9f40, 0 0 12px #ff9f40; }
 .card.red { color: #d12b3b; }
 .card.back { background: repeating-linear-gradient(45deg, #224, #224 6px, #334 6px, #334 12px); color: transparent; border-color: #223; }
 
