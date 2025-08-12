@@ -52,10 +52,10 @@
 
   // プレイヤー
   const players = [
-    { id: 0, name: 'あなた', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: true },
-    { id: 1, name: 'Bot A', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
-    { id: 2, name: 'Bot B', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
-    { id: 3, name: 'Bot C', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
+    { id: 0, name: 'あなた', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: true },
+    { id: 1, name: 'Bot A', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false },
+    { id: 2, name: 'Bot B', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false },
+    { id: 3, name: 'Bot C', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false },
   ];
 
   // ゲーム状態
@@ -74,14 +74,28 @@
     acted: new Set(), // 直近のレイズ以降でベット状況を満たしたプレイヤー
   };
 
-  // 指定した座席から、次のアクティブ（未フォールド）プレイヤーIDを返す
+  // 指定した座席から、次のアクティブ（未フォールド・未オールイン・未離脱）プレイヤーIDを返す
   function nextActiveFrom(startIdx) {
     const n = players.length;
     for (let i = 0; i < n; i++) {
       const pid = (startIdx + i) % n;
-      if (!players[pid].folded && !players[pid].allIn) return pid;
+      if (!players[pid].folded && !players[pid].allIn && !players[pid].out) return pid;
     }
     return startIdx; // フォールバック（理論上到達しない）
+  }
+
+  // 指定した座席から、次の参加可能（未離脱）プレイヤーIDを返す
+  function nextNonOutFrom(startIdx) {
+    const n = players.length;
+    for (let i = 0; i < n; i++) {
+      const pid = (startIdx + i) % n;
+      if (!players[pid].out) return pid;
+    }
+    return startIdx;
+  }
+
+  function alivePlayersCount() {
+    return players.filter(p => !p.out).length;
   }
 
   // ログ
@@ -104,13 +118,13 @@
       $('bet-' + p.id).textContent = String(p.bet);
       const cardsBox = $('cards-' + p.id);
       cardsBox.innerHTML = '';
-      const faceUp = p.isUser || state.street === 'showdown';
-      if (p.hand.length) {
+      const faceUp = (p.isUser || state.street === 'showdown') && !p.out;
+      if (p.hand.length && !p.out) {
         cardsBox.appendChild(cardEl(p.hand[0], faceUp));
         cardsBox.appendChild(cardEl(p.hand[1], faceUp));
       }
       const st = $('state-' + p.id);
-      st.textContent = p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : ''));
+      st.textContent = p.out ? '離脱' : (p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : '')));
       if (state.street === 'idle') st.textContent = '';
     }
     updateControls();
@@ -118,7 +132,7 @@
 
   function updateControls() {
     const me = players[0];
-    const isMyTurn = state.toAct === 0 && !me.folded && !me.allIn && state.street !== 'idle' && state.street !== 'showdown';
+    const isMyTurn = state.toAct === 0 && !me.folded && !me.allIn && !me.out && state.street !== 'idle' && state.street !== 'showdown';
     btnFold.disabled = !isMyTurn;
     btnCheck.disabled = !isMyTurn || !(me.bet === state.currentBet);
     const callAmt = state.currentBet - me.bet;
@@ -141,6 +155,14 @@
 
   // 新しいハンド
   function newHand() {
+    // ゲーム続行可能か判定（参加者が2人未満なら終了）
+    if (alivePlayersCount() < 2) {
+      state.street = 'idle';
+      log('ゲーム終了：残り参加者が1人以下です');
+      renderAll();
+      return;
+    }
+
     state.deck = createDeck();
     state.board = [];
     state.pot = 0;
@@ -149,12 +171,12 @@
     state.minRaise = state.bb;
     state.lastAggressor = null;
     state.acted = new Set();
-    for (const p of players) { p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; }
+    for (const p of players) { if (!p.out) { p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; } else { p.hand = []; p.folded = true; p.bet = 0; p.total = 0; p.allIn = false; } }
     // ボタン移動
-    state.dealer = (state.dealer + 1) % players.length;
+    state.dealer = nextNonOutFrom((state.dealer + 1) % players.length);
     // ブラインド
-    const sbPos = (state.dealer + 1) % players.length;
-    const bbPos = (state.dealer + 2) % players.length;
+    const sbPos = nextNonOutFrom((state.dealer + 1) % players.length);
+    const bbPos = nextNonOutFrom((sbPos + 1) % players.length);
     betForced(sbPos, state.sb, 'SB');
     betForced(bbPos, state.bb, 'BB');
     state.currentBet = state.bb;
@@ -162,7 +184,8 @@
     // 配札
     for (let i = 0; i < 2; i++) {
       for (let p = 0; p < players.length; p++) {
-        players[(state.dealer + 1 + p) % players.length].hand.push(state.deck.pop());
+        const pid = (state.dealer + 1 + p) % players.length;
+        if (!players[pid].out) players[pid].hand.push(state.deck.pop());
       }
     }
     // アクション開始はBBの次（フォールド席はスキップ）
@@ -174,6 +197,7 @@
 
   function betForced(pid, amt, label) {
     const p = players[pid];
+    if (p.out) return;
     const pay = Math.min(amt, p.chips);
     if (pay <= 0) return;
     p.chips -= pay; p.bet += pay; p.total += pay; state.pot += pay;
@@ -186,14 +210,14 @@
     for (let i = 1; i <= players.length; i++) {
       const nid = (state.toAct + i) % players.length;
       const np = players[nid];
-      if (!np.folded && !np.allIn) { state.toAct = nid; return; }
+      if (!np.folded && !np.allIn && !np.out) { state.toAct = nid; return; }
     }
     state.toAct = 0; // fallback
   }
 
   // 全員のベットが整っているか（フォールド or オールイン or 現在額一致）
   function allSettled() {
-    const active = players.filter(p => !p.folded);
+    const active = players.filter(p => !p.folded && !p.out);
     if (active.length <= 1) return true;
     for (const p of active) {
       if (!p.allIn && p.bet !== state.currentBet) return false;
@@ -214,7 +238,7 @@
     state.lastAggressor = null;
     state.acted = new Set();
 
-    if (players.filter(p => !p.folded).length <= 1) {
+    if (players.filter(p => !p.folded && !p.out).length <= 1) {
       showdown();
       return;
     }
@@ -234,7 +258,7 @@
       return;
     }
     // 次はSBの次（フロップ以降）
-    const sbPos = (state.dealer + 1) % players.length;
+    const sbPos = nextNonOutFrom((state.dealer + 1) % players.length);
     state.toAct = nextActiveFrom((sbPos + 1) % players.length);
     renderAll();
     if (!players.some(p => !p.folded && !p.allIn)) {
@@ -247,7 +271,7 @@
 
   function playerAction(pid, action, amount = 0) {
     const p = players[pid];
-    if (p.folded || state.street === 'idle' || state.street === 'showdown') return;
+    if (p.folded || p.out || state.street === 'idle' || state.street === 'showdown') return;
     if (action === 'fold') {
       p.folded = true; state.acted.delete(pid); log(`${p.name}: フォールド`);
     } else if (action === 'check') {
@@ -293,7 +317,7 @@
     }
 
     // ラウンド終了判定（全アクティブが最新レイズ以降「行動済み」かつ整合）
-    const active = players.filter(pp => !pp.folded);
+    const active = players.filter(pp => !pp.folded && !pp.out);
     if (active.length <= 1) { showdown(); return; }
     if (allSettled() && allActedOrUnable()) {
       goNextStreet();
@@ -310,7 +334,7 @@
   function showdown() {
     state.street = 'showdown';
     renderAll();
-    const active = players.filter(p => !p.folded);
+    const active = players.filter(p => !p.folded && !p.out);
     if (active.length === 1) {
       active[0].chips += state.pot;
       log(`勝者: ${active[0].name}（全員フォールド） 獲得 ${state.pot}`);
@@ -338,6 +362,23 @@
       log(`ポット${idx+1}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
     });
     state.pot = 0;
+    // チップが尽きたプレイヤーは離脱
+    for (const p of players) {
+      if (!p.out && p.chips <= 0) {
+        p.out = true;
+        p.folded = true;
+        p.allIn = false;
+        log(`${p.name}: チップが尽きたため離脱`);
+      }
+    }
+    // 残り人数チェック
+    const alive = players.filter(p => !p.out);
+    if (alive.length <= 1) {
+      const champ = alive[0];
+      if (champ) log(`ゲーム終了: 優勝 ${champ.name}`);
+      else log('ゲーム終了: 参加者なし');
+      state.street = 'idle';
+    }
     renderAll();
   }
 
@@ -468,7 +509,7 @@
   function turnLoopIfBot() {
     const p = players[state.toAct];
     if (!p) return;
-    if (p.isUser || p.folded || state.street==='idle' || state.street==='showdown') return;
+    if (p.isUser || p.folded || p.out || p.allIn || state.street==='idle' || state.street==='showdown') return;
     // 少し待ってから行動
     setTimeout(() => botAct(p.id), 450 + Math.random()*400);
   }
