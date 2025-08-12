@@ -17,6 +17,7 @@
   const winnersSet = new Set(); // 勝者のプレイヤーID集合（メイン/サイド含む）
   const boardSoftHL = new Set(); // 全員の使用コミュニティカード（淡色）
   const boardStrongHL = new Set(); // 勝者の使用コミュニティカード（濃色）
+  const winnersCount = new Map(); // プレイヤーID -> 勝利ポット数
 
   const btnNew = document.getElementById('btn-new');
   const btnFold = document.getElementById('btn-fold');
@@ -152,6 +153,13 @@
         st.textContent = p.out ? '離脱' : (p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : '')));
       }
       if (state.street === 'idle') st.textContent = '';
+      // 勝者バッジを名前の右に表示
+      const nameEl = $('name-' + p.id);
+      if (state.street === 'showdown' && winnersCount.get(p.id) > 0) {
+        nameEl.innerHTML = `${p.name}<span class="badge">勝者×${winnersCount.get(p.id)}</span>`;
+      } else {
+        nameEl.textContent = p.name;
+      }
     }
     // ポット内訳表示（メイン/サイド）
     if (potsEl) {
@@ -408,6 +416,7 @@
     winnersSet.clear();
     boardSoftHL.clear();
     boardStrongHL.clear();
+    winnersCount.clear();
     for (const p of active) {
       const res = best5Detailed([...p.hand, ...state.board]);
       showdownInfo.set(p.id, res);
@@ -445,6 +454,7 @@
       // 勝者のIDを登録し、勝因のコミュニティカードを強調対象へ
       for (const wid of winners) {
         winnersSet.add(wid);
+        winnersCount.set(wid, (winnersCount.get(wid) || 0) + 1);
         const used = showdownInfo.get(wid)?.used || [];
         for (const card of used) if (state.board.includes(card)) boardStrongHL.add(card);
       }
@@ -474,6 +484,47 @@
     }
     renderAll();
   }
+
+  // ホットキー（F/C/R/A）
+  window.addEventListener('keydown', (e) => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+    const key = e.key;
+    const me = players[0];
+    const isMyTurn = state.toAct === 0 && !me.folded && !me.allIn && !me.out && state.street !== 'idle' && state.street !== 'showdown';
+    if (!isMyTurn || typing) return;
+    if (['f','F','c','C','r','R','a','A'].includes(key)) e.preventDefault();
+    if (key === 'f' || key === 'F') return playerAction(0,'fold');
+    if (key === 'c' || key === 'C') return (me.bet === state.currentBet) ? playerAction(0,'check') : playerAction(0,'call');
+    if (key === 'a' || key === 'A') return playerAction(0,'allin');
+    if (key === 'r' || key === 'R') { raiseAmt.focus(); raiseAmt.select(); }
+  });
+
+  // レイズプリセット
+  const rsMin = document.getElementById('rs-min');
+  const rsHP = document.getElementById('rs-hp');
+  const rsPot = document.getElementById('rs-pot');
+  const rs2P = document.getElementById('rs-2p');
+
+  function setRaiseTo(total) {
+    const me = players[0];
+    const minTotal = state.currentBet + state.minRaise;
+    const maxTotal = me.bet + me.chips; // オールイン上限
+    const clamped = Math.max(minTotal, Math.min(total, maxTotal));
+    raiseAmt.value = String(clamped);
+    updateControls();
+  }
+
+  function potBasedAmount(mult) {
+    // ざっくりのポット基準（現在 pot を利用）
+    const base = Math.floor(state.pot * mult);
+    return state.currentBet + Math.max(state.minRaise, base);
+  }
+
+  rsMin && rsMin.addEventListener('click', () => setRaiseTo(state.currentBet + state.minRaise));
+  rsHP && rsHP.addEventListener('click', () => setRaiseTo(potBasedAmount(0.5)));
+  rsPot && rsPot.addEventListener('click', () => setRaiseTo(potBasedAmount(1)));
+  rs2P && rs2P.addEventListener('click', () => setRaiseTo(potBasedAmount(2)));
 
   // サイドポット計算
   function computePots() {
