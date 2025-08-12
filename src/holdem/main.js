@@ -13,6 +13,7 @@
   const streetEl = document.getElementById('street');
   const turnEl = document.getElementById('turn');
   const potsEl = document.getElementById('pots');
+  const showdownInfo = new Map(); // プレイヤーID -> { score, used: Card[] }
 
   const btnNew = document.getElementById('btn-new');
   const btnFold = document.getElementById('btn-fold');
@@ -122,11 +123,22 @@
       cardsBox.innerHTML = '';
       const faceUp = (p.isUser || state.street === 'showdown') && !p.out;
       if (p.hand.length && !p.out) {
-        cardsBox.appendChild(cardEl(p.hand[0], faceUp));
-        cardsBox.appendChild(cardEl(p.hand[1], faceUp));
+        const c0 = cardEl(p.hand[0], faceUp);
+        const c1 = cardEl(p.hand[1], faceUp);
+        if (state.street === 'showdown' && showdownInfo.has(p.id)) {
+          const used = new Set(showdownInfo.get(p.id).used);
+          if (used.has(p.hand[0])) c0.classList.add('hl');
+          if (used.has(p.hand[1])) c1.classList.add('hl');
+        }
+        cardsBox.appendChild(c0);
+        cardsBox.appendChild(c1);
       }
       const st = $('state-' + p.id);
-      st.textContent = p.out ? '離脱' : (p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : '')));
+      if (state.street === 'showdown' && showdownInfo.has(p.id)) {
+        st.textContent = handName(showdownInfo.get(p.id).score);
+      } else {
+        st.textContent = p.out ? '離脱' : (p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : '')));
+      }
       if (state.street === 'idle') st.textContent = '';
     }
     // ポット内訳表示（メイン/サイド）
@@ -137,7 +149,8 @@
         pots.forEach((pot, idx) => {
           const div = document.createElement('div');
           const label = idx === 0 ? 'メイン' : `サイド${idx}`;
-          div.textContent = `${label}:${pot.amount}`;
+          const names = pot.eligible.map(id => players[id].name).join(', ');
+          div.textContent = `${label}:${pot.amount}（参加: ${names}）`;
           div.style.background = 'rgba(0,0,0,0.25)';
           div.style.padding = '2px 6px';
           div.style.borderRadius = '8px';
@@ -377,8 +390,14 @@
   // ショーダウン
   function showdown() {
     state.street = 'showdown';
-    renderAll();
     const active = players.filter(p => !p.folded && !p.out);
+    // 役を事前計算
+    showdownInfo.clear();
+    for (const p of active) {
+      const res = best5Detailed([...p.hand, ...state.board]);
+      showdownInfo.set(p.id, res);
+    }
+    renderAll();
     if (active.length === 1) {
       active[0].chips += state.pot;
       log(`勝者: ${active[0].name}（全員フォールド） 獲得 ${state.pot}`);
@@ -388,7 +407,7 @@
     const pots = computePots();
     const scores = new Map();
     for (const p of players) {
-      if (!p.folded) scores.set(p.id, best5Score([...p.hand, ...state.board]));
+      if (!p.folded && !p.out) scores.set(p.id, showdownInfo.get(p.id)?.score);
     }
     pots.forEach((pot, idx) => {
       const elig = pot.eligible.filter(id => !players[id].folded && !players[id].out);
@@ -444,7 +463,7 @@
       const participants = positive.map(o=>o.i);
       const amount = min * participants.length;
       participants.forEach(i => remaining[i] -= min);
-      pots.push({ amount, eligible: participants });
+      pots.push({ amount, eligible: participants, chunk: min });
     }
     return pots;
   }
@@ -508,12 +527,43 @@
     return best;
   }
 
+  function best5Detailed(cards7) {
+    let best = null;
+    let bestCards = null;
+    for (let i=0;i<cards7.length;i++){
+      for (let j=i+1;j<cards7.length;j++){
+        const five = cards7.filter((_,idx)=>idx!==i && idx!==j);
+        const s = score5(five);
+        if (!best || compareScore(s, best) > 0) { best = s; bestCards = five; }
+      }
+    }
+    return { score: best, used: bestCards };
+  }
+
   function compareScore(a, b) {
     for (let i=0;i<Math.max(a.length,b.length);i++){
       const av=a[i]??0, bv=b[i]??0;
       if (av!==bv) return av>bv?1:-1;
     }
     return 0;
+  }
+
+  // 役名（日本語）
+  function handName(score) {
+    if (!score) return '';
+    const cat = score[0];
+    const r = (v)=>rankLabel(v);
+    switch (cat) {
+      case 8: return `ストレートフラッシュ（${r(score[1])}ハイ）`;
+      case 7: return `フォーカード（${r(score[1])}）`;
+      case 6: return `フルハウス（${r(score[1])} フル ${r(score[2])}）`;
+      case 5: return `フラッシュ`;
+      case 4: return `ストレート（${r(score[1])}ハイ）`;
+      case 3: return `スリーカード（${r(score[1])}）`;
+      case 2: return `ツーペア（${r(score[1])} と ${r(score[2])}）`;
+      case 1: return `ワンペア（${r(score[1])}）`;
+      default: return `ハイカード（${r(score[1])}）`;
+    }
   }
 
   // 簡易Botロジック
