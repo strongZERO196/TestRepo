@@ -9,10 +9,12 @@
   <body>
     <div class="wrap">
       <h1>テキサスホールデム</h1>
-      <div class="table" id="table">
-        <div class="pot">ポット: <strong id="pot">0</strong></div>
-        <div class="board" id="board"></div>
-        <div class="seats">
+      <div class="grid">
+        <div class="left">
+          <div class="table" id="table">
+            <div class="pot">ポット: <strong id="pot">0</strong></div>
+            <div class="board" id="board"></div>
+            <div class="seats">
           <div class="seat seat-0" data-seat="0">
             <div class="cards" id="cards-0"></div>
             <div class="info">
@@ -49,40 +51,44 @@
               <div class="state" id="state-3"></div>
             </div>
           </div>
+            </div>
+          </div>
         </div>
+        <aside class="sidebar">
+          <div class="controls">
+            <div class="row">
+              <button id="btn-new">新しいハンド</button>
+              <span id="street"></span>
+              <span id="turn"></span>
+            </div>
+            <div class="row row-actions">
+              <button id="btn-fold" disabled>フォールド</button>
+              <button id="btn-check" disabled>チェック</button>
+              <button id="btn-call" disabled>コール</button>
+              <button id="btn-allin" disabled>オールイン</button>
+            </div>
+            <div class="row row-bet">
+              <label class="raise">
+                レイズ: <input type="number" id="raise-amt" min="0" step="10" value="40" />
+                <button id="btn-raise" disabled>レイズ</button>
+              </label>
+            </div>
+            <div class="row">
+              <span>プリセット:</span>
+              <button id="rs-min" class="rs">最小</button>
+              <button id="rs-hp" class="rs">1/2ポット</button>
+              <button id="rs-pot" class="rs">ポット</button>
+              <button id="rs-2p" class="rs">2×ポット</button>
+              <span style="color:#a7b0bd; font-size:12px;">（R=レイズ入力 / A=オールイン / C=チェック/コール / F=フォールド）</span>
+            </div>
+            <div class="row">
+              <span>ポット内訳:</span>
+              <div id="pots" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+            </div>
+          </div>
+        </aside>
+        <div class="log" id="log"></div>
       </div>
-
-      <div class="controls">
-        <div class="row">
-          <button id="btn-new">新しいハンド</button>
-          <span id="street"></span>
-          <span id="turn"></span>
-        </div>
-        <div class="row">
-          <button id="btn-fold" disabled>フォールド</button>
-          <button id="btn-check" disabled>チェック</button>
-          <button id="btn-call" disabled>コール</button>
-          <button id="btn-allin" disabled>オールイン</button>
-          <label class="raise">
-            レイズ: <input type="number" id="raise-amt" min="0" step="10" value="40" />
-            <button id="btn-raise" disabled>レイズ</button>
-          </label>
-        </div>
-        <div class="row">
-          <span>プリセット:</span>
-          <button id="rs-min" class="rs">最小</button>
-          <button id="rs-hp" class="rs">1/2ポット</button>
-          <button id="rs-pot" class="rs">ポット</button>
-          <button id="rs-2p" class="rs">2×ポット</button>
-          <span style="color:#a7b0bd; font-size:12px;">（R=レイズ入力 / A=オールイン / C=チェック/コール / F=フォールド）</span>
-        </div>
-        <div class="row">
-          <span>ポット内訳:</span>
-          <div id="pots" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-        </div>
-      </div>
-
-      <div class="log" id="log"></div>
     </div>
 
     <script src="main.js"></script>

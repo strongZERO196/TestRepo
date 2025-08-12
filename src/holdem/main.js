@@ -107,8 +107,22 @@
 
   // ログ
   function log(msg) {
+    // 既存ログパネル
     logEl.textContent += msg + '\n';
     logEl.scrollTop = logEl.scrollHeight;
+    // biim風オーバーレイ
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+      const line = document.createElement('div');
+      line.className = 'overlay-line';
+      line.textContent = msg;
+      overlay.appendChild(line);
+      // 上限行数を維持
+      while (overlay.children.length > 8) overlay.firstChild.remove();
+      line.addEventListener('animationend', () => {
+        line.remove();
+      });
+    }
   }
 
   // 表示更新
