@@ -52,10 +52,10 @@
 
   // プレイヤー
   const players = [
-    { id: 0, name: 'あなた', chips: 2000, hand: [], folded: false, bet: 0, isUser: true },
-    { id: 1, name: 'Bot A', chips: 2000, hand: [], folded: false, bet: 0, isUser: false },
-    { id: 2, name: 'Bot B', chips: 2000, hand: [], folded: false, bet: 0, isUser: false },
-    { id: 3, name: 'Bot C', chips: 2000, hand: [], folded: false, bet: 0, isUser: false },
+    { id: 0, name: 'あなた', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: true },
+    { id: 1, name: 'Bot A', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
+    { id: 2, name: 'Bot B', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
+    { id: 3, name: 'Bot C', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, isUser: false },
   ];
 
   // ゲーム状態
@@ -79,7 +79,7 @@
     const n = players.length;
     for (let i = 0; i < n; i++) {
       const pid = (startIdx + i) % n;
-      if (!players[pid].folded) return pid;
+      if (!players[pid].folded && !players[pid].allIn) return pid;
     }
     return startIdx; // フォールバック（理論上到達しない）
   }
@@ -110,7 +110,7 @@
         cardsBox.appendChild(cardEl(p.hand[1], faceUp));
       }
       const st = $('state-' + p.id);
-      st.textContent = p.folded ? 'フォールド' : (state.toAct === p.id ? '行動中' : '');
+      st.textContent = p.folded ? 'フォールド' : (p.allIn ? 'オールイン' : (state.toAct === p.id ? '行動中' : ''));
       if (state.street === 'idle') st.textContent = '';
     }
     updateControls();
@@ -118,12 +118,18 @@
 
   function updateControls() {
     const me = players[0];
-    const isMyTurn = state.toAct === 0 && !me.folded && state.street !== 'idle' && state.street !== 'showdown';
+    const isMyTurn = state.toAct === 0 && !me.folded && !me.allIn && state.street !== 'idle' && state.street !== 'showdown';
     btnFold.disabled = !isMyTurn;
     btnCheck.disabled = !isMyTurn || !(me.bet === state.currentBet);
     const callAmt = state.currentBet - me.bet;
-    btnCall.textContent = me.bet === state.currentBet ? 'チェック' : `コール(${callAmt})`;
-    btnCall.disabled = !isMyTurn || (me.bet !== state.currentBet && me.chips < callAmt);
+    if (me.bet === state.currentBet) {
+      btnCall.textContent = 'チェック';
+    } else if (me.chips < callAmt) {
+      btnCall.textContent = `オールイン(${Math.max(0, me.chips)})`;
+    } else {
+      btnCall.textContent = `コール(${callAmt})`;
+    }
+    btnCall.disabled = !isMyTurn || (me.bet !== state.currentBet && me.chips <= 0);
     btnCheck.style.display = me.bet === state.currentBet ? 'inline-block' : 'none';
     btnCall.style.display = me.bet === state.currentBet ? 'none' : 'inline-block';
     const minRaiseTotal = state.currentBet + state.minRaise;
@@ -143,7 +149,7 @@
     state.minRaise = state.bb;
     state.lastAggressor = null;
     state.acted = new Set();
-    for (const p of players) { p.hand = []; p.folded = false; p.bet = 0; }
+    for (const p of players) { p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; }
     // ボタン移動
     state.dealer = (state.dealer + 1) % players.length;
     // ブラインド
@@ -168,15 +174,11 @@
 
   function betForced(pid, amt, label) {
     const p = players[pid];
-    const bet = Math.min(amt, p.chips);
-    if (bet < amt) {
-      // 簡略化: ブラインド未満しか出せない場合はフォールド扱い
-      p.folded = true;
-      log(`${p.name}: ${label} 不足でフォールド`);
-      return;
-    }
-    p.chips -= bet; p.bet += bet; state.pot += bet;
-    log(`${p.name}: ${label} ${bet}`);
+    const pay = Math.min(amt, p.chips);
+    if (pay <= 0) return;
+    p.chips -= pay; p.bet += pay; p.total += pay; state.pot += pay;
+    if (p.chips === 0) p.allIn = true;
+    log(`${p.name}: ${label} ${pay}${p.allIn ? '（オールイン）' : ''}`);
   }
 
   // アクション進行
@@ -184,16 +186,24 @@
     for (let i = 1; i <= players.length; i++) {
       const nid = (state.toAct + i) % players.length;
       const np = players[nid];
-      if (!np.folded) { state.toAct = nid; return; }
+      if (!np.folded && !np.allIn) { state.toAct = nid; return; }
     }
     state.toAct = 0; // fallback
   }
 
-  function allBetsEqualOrFolded() {
+  // 全員のベットが整っているか（フォールド or オールイン or 現在額一致）
+  function allSettled() {
     const active = players.filter(p => !p.folded);
     if (active.length <= 1) return true;
-    const target = active[0].bet;
-    return active.every(p => p.bet === target);
+    for (const p of active) {
+      if (!p.allIn && p.bet !== state.currentBet) return false;
+    }
+    return true;
+  }
+
+  function allActedOrUnable() {
+    const everyone = players.filter(p => !p.folded);
+    return everyone.every(p => p.allIn || state.acted.has(p.id));
   }
 
   function goNextStreet() {
@@ -227,7 +237,12 @@
     const sbPos = (state.dealer + 1) % players.length;
     state.toAct = nextActiveFrom((sbPos + 1) % players.length);
     renderAll();
-    turnLoopIfBot();
+    if (!players.some(p => !p.folded && !p.allIn)) {
+      // 全員オールインなら自動で次ストリートへ
+      setTimeout(goNextStreet, 600);
+    } else {
+      turnLoopIfBot();
+    }
   }
 
   function playerAction(pid, action, amount = 0) {
@@ -241,11 +256,15 @@
       state.acted.add(pid);
     } else if (action === 'call') {
       const need = state.currentBet - p.bet;
-      if (need <= 0) return;
-      if (p.chips < need) { // 簡略: 不足はフォールド
-        p.folded = true; state.acted.delete(pid); log(`${p.name}: コール不足でフォールド`);
+      if (need <= 0) { /* チェック相当 */ log(`${p.name}: チェック`); state.acted.add(pid); }
+      else if (p.chips <= 0) { /* 何もしない */ }
+      else if (p.chips < need) { // オールイン・コール（部分）
+        const pay = p.chips;
+        p.chips = 0; p.allIn = true; p.bet += pay; p.total += pay; state.pot += pay;
+        log(`${p.name}: オールイン（${pay}）`);
+        state.acted.add(pid);
       } else {
-        p.chips -= need; p.bet += need; state.pot += need;
+        p.chips -= need; p.bet += need; p.total += need; state.pot += need;
         log(`${p.name}: コール ${need}`);
         state.acted.add(pid);
       }
@@ -254,10 +273,16 @@
       if (amount < minTotal) amount = minTotal;
       const need = amount - p.bet;
       if (need <= 0) return;
-      if (p.chips < need) { // 簡略: 不足はフォールド
-        p.folded = true; state.acted.delete(pid); log(`${p.name}: レイズ不足でフォールド`);
+      if (p.chips < need) {
+        // レイズ最低額に満たない場合は、可能な範囲でのコール（オールイン）扱い。
+        const pay = p.chips;
+        if (pay > 0) {
+          p.chips = 0; p.allIn = true; p.bet += pay; p.total += pay; state.pot += pay;
+          log(`${p.name}: オールイン（${pay}）`);
+          state.acted.add(pid);
+        }
       } else {
-        p.chips -= need; p.bet += need; state.pot += need;
+        p.chips -= need; p.bet += need; p.total += need; state.pot += need;
         state.minRaise = Math.max(state.minRaise, amount - state.currentBet);
         state.currentBet = amount;
         state.lastAggressor = pid;
@@ -267,10 +292,10 @@
       }
     }
 
-    // ラウンド終了判定（全アクティブが最新レイズ以降「行動済み」かつ同額）
+    // ラウンド終了判定（全アクティブが最新レイズ以降「行動済み」かつ整合）
     const active = players.filter(pp => !pp.folded);
     if (active.length <= 1) { showdown(); return; }
-    if (allBetsEqualOrFolded() && active.every(pp => state.acted.has(pp.id))) {
+    if (allSettled() && allActedOrUnable()) {
       goNextStreet();
       return;
     }
@@ -291,17 +316,45 @@
       log(`勝者: ${active[0].name}（全員フォールド） 獲得 ${state.pot}`);
       state.pot = 0; renderAll(); return;
     }
-    // 7枚中ベスト5枚を評価
-    const results = active.map(p => ({ p, score: best5Score([...p.hand, ...state.board]) }));
-    results.sort((a,b) => compareScore(b.score, a.score));
-    const best = results[0];
-    // 同点は単純分配（端数切り捨て）
-    const winners = results.filter(r => compareScore(r.score, best.score) === 0);
-    const share = Math.floor(state.pot / winners.length);
-    winners.forEach(w => { w.p.chips += share; });
-    log(`勝者: ${winners.map(w => w.p.name).join(', ')} 獲得 ${share}${winners.length>1?'×'+winners.length:''}`);
+    // サイドポットを計算して順に分配
+    const pots = computePots();
+    const scores = new Map();
+    for (const p of players) {
+      if (!p.folded) scores.set(p.id, best5Score([...p.hand, ...state.board]));
+    }
+    pots.forEach((pot, idx) => {
+      const elig = pot.eligible.filter(id => !players[id].folded);
+      if (elig.length === 0 || pot.amount <= 0) return;
+      let best = null; let winners = [];
+      for (const id of elig) {
+        const sc = scores.get(id);
+        if (!best || compareScore(sc, best) > 0) { best = sc; winners = [id]; }
+        else if (compareScore(sc, best) === 0) winners.push(id);
+      }
+      const share = Math.floor(pot.amount / winners.length);
+      let remainder = pot.amount - share * winners.length;
+      for (const id of winners) players[id].chips += share;
+      if (remainder > 0) players[winners[0]].chips += remainder; // 余りは先頭へ（簡略）
+      log(`ポット${idx+1}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
+    });
     state.pot = 0;
     renderAll();
+  }
+
+  // サイドポット計算
+  function computePots() {
+    const remaining = players.map(p => Math.max(0, p.total));
+    const pots = [];
+    while (true) {
+      const positive = remaining.map((v,i)=>({v,i})).filter(o=>o.v>0);
+      if (positive.length === 0) break;
+      const min = Math.min(...positive.map(o=>o.v));
+      const participants = positive.map(o=>o.i);
+      const amount = min * participants.length;
+      participants.forEach(i => remaining[i] -= min);
+      pots.push({ amount, eligible: participants });
+    }
+    return pots;
   }
 
   // スコアリング（5枚）
