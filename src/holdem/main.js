@@ -14,7 +14,9 @@
   const turnEl = document.getElementById('turn');
   const potsEl = document.getElementById('pots');
   const showdownInfo = new Map(); // プレイヤーID -> { score, used: Card[] }
-  const boardHL = new Set(); // ボード上でハイライトするカード
+  const winnersSet = new Set(); // 勝者のプレイヤーID集合（メイン/サイド含む）
+  const boardSoftHL = new Set(); // 全員の使用コミュニティカード（淡色）
+  const boardStrongHL = new Set(); // 勝者の使用コミュニティカード（濃色）
 
   const btnNew = document.getElementById('btn-new');
   const btnFold = document.getElementById('btn-fold');
@@ -117,7 +119,10 @@
     boardEl.innerHTML = '';
     state.board.forEach(c => {
       const el = cardEl(c, true);
-      if (state.street === 'showdown' && boardHL.has(c)) el.classList.add('hl');
+      if (state.street === 'showdown') {
+        if (boardStrongHL.has(c)) el.classList.add('hl-strong');
+        else if (boardSoftHL.has(c)) el.classList.add('hl-soft');
+      }
       el.classList.add('board-card');
       boardEl.appendChild(el);
     });
@@ -133,8 +138,9 @@
         const c1 = cardEl(p.hand[1], faceUp);
         if (state.street === 'showdown' && showdownInfo.has(p.id)) {
           const used = new Set(showdownInfo.get(p.id).used);
-          if (used.has(p.hand[0])) c0.classList.add('hl');
-          if (used.has(p.hand[1])) c1.classList.add('hl');
+          const cls = winnersSet.has(p.id) ? 'hl-strong' : 'hl-soft';
+          if (used.has(p.hand[0])) c0.classList.add(cls);
+          if (used.has(p.hand[1])) c1.classList.add(cls);
         }
         cardsBox.appendChild(c0);
         cardsBox.appendChild(c1);
@@ -399,10 +405,14 @@
     const active = players.filter(p => !p.folded && !p.out);
     // 役を事前計算
     showdownInfo.clear();
-    boardHL.clear();
+    winnersSet.clear();
+    boardSoftHL.clear();
+    boardStrongHL.clear();
     for (const p of active) {
       const res = best5Detailed([...p.hand, ...state.board]);
       showdownInfo.set(p.id, res);
+      // ボード側の淡色ハイライト候補
+      for (const card of res.used) if (state.board.includes(card)) boardSoftHL.add(card);
     }
     renderAll();
     if (active.length === 1) {
@@ -432,10 +442,11 @@
         if (!best || compareScore(sc, best) > 0) { best = sc; winners = [id]; }
         else if (compareScore(sc, best) === 0) winners.push(id);
       }
-      // 勝者の使用カードのうち、ボードにあるカードをハイライト対象に追加
+      // 勝者のIDを登録し、勝因のコミュニティカードを強調対象へ
       for (const wid of winners) {
+        winnersSet.add(wid);
         const used = showdownInfo.get(wid)?.used || [];
-        for (const card of used) if (state.board.includes(card)) boardHL.add(card);
+        for (const card of used) if (state.board.includes(card)) boardStrongHL.add(card);
       }
       const share = Math.floor(pot.amount / winners.length);
       let remainder = pot.amount - share * winners.length;
