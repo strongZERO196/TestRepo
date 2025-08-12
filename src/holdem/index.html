@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>テキサスホールデム</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>テキサスホールデム</h1>
+      <div class="table" id="table">
+        <div class="pot">ポット: <strong id="pot">0</strong></div>
+        <div class="board" id="board"></div>
+        <div class="seats">
+          <div class="seat seat-0" data-seat="0">
+            <div class="cards" id="cards-0"></div>
+            <div class="info">
+              <div class="name" id="name-0">あなた</div>
+              <div>チップ: <span id="chips-0">0</span></div>
+              <div>ベット: <span id="bet-0">0</span></div>
+              <div class="state" id="state-0"></div>
+            </div>
+          </div>
+          <div class="seat seat-1" data-seat="1">
+            <div class="cards" id="cards-1"></div>
+            <div class="info">
+              <div class="name" id="name-1">Bot A</div>
+              <div>チップ: <span id="chips-1">0</span></div>
+              <div>ベット: <span id="bet-1">0</span></div>
+              <div class="state" id="state-1"></div>
+            </div>
+          </div>
+          <div class="seat seat-2" data-seat="2">
+            <div class="cards" id="cards-2"></div>
+            <div class="info">
+              <div class="name" id="name-2">Bot B</div>
+              <div>チップ: <span id="chips-2">0</span></div>
+              <div>ベット: <span id="bet-2">0</span></div>
+              <div class="state" id="state-2"></div>
+            </div>
+          </div>
+          <div class="seat seat-3" data-seat="3">
+            <div class="cards" id="cards-3"></div>
+            <div class="info">
+              <div class="name" id="name-3">Bot C</div>
+              <div>チップ: <span id="chips-3">0</span></div>
+              <div>ベット: <span id="bet-3">0</span></div>
+              <div class="state" id="state-3"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="row">
+          <button id="btn-new">新しいハンド</button>
+          <span id="street"></span>
+          <span id="turn"></span>
+        </div>
+        <div class="row">
+          <button id="btn-fold" disabled>フォールド</button>
+          <button id="btn-check" disabled>チェック</button>
+          <button id="btn-call" disabled>コール</button>
+          <label class="raise">
+            レイズ: <input type="number" id="raise-amt" min="0" step="10" value="40" />
+            <button id="btn-raise" disabled>レイズ</button>
+          </label>
+        </div>
+      </div>
+
+      <div class="log" id="log"></div>
+    </div>
+
+    <script src="main.js"></script>
+  </body>
+  </html>
+
