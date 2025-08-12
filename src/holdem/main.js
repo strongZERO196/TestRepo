@@ -18,6 +18,7 @@
   const btnCheck = document.getElementById('btn-check');
   const btnCall = document.getElementById('btn-call');
   const btnRaise = document.getElementById('btn-raise');
+  const btnAllin = document.getElementById('btn-allin');
   const raiseAmt = document.getElementById('raise-amt');
 
   function $(id) { return document.getElementById(id); }
@@ -151,6 +152,8 @@
     raiseAmt.step = String(state.bb);
     if (Number(raiseAmt.value) < minRaiseTotal) raiseAmt.value = String(minRaiseTotal);
     btnRaise.disabled = !isMyTurn || me.chips < (minRaiseTotal - me.bet);
+    btnAllin.disabled = !isMyTurn || me.chips <= 0;
+    if (!btnAllin.disabled) btnAllin.textContent = `オールイン(${me.chips})`;
   }
 
   // 新しいハンド
@@ -313,6 +316,30 @@
         // レイズが入ったので「行動済み」情報をリセット（レイザーのみ行動済み扱い）
         state.acted = new Set([pid]);
         log(`${p.name}: レイズ ${need}（合計ベット ${amount}）`);
+      }
+    } else if (action === 'allin') {
+      if (p.chips <= 0) return;
+      const prevBetLevel = state.currentBet;
+      const prevPBet = p.bet;
+      const pay = p.chips;
+      p.chips = 0; p.allIn = true; p.bet += pay; p.total += pay; state.pot += pay;
+      log(`${p.name}: オールイン（${pay}）`);
+      const newTotal = p.bet;
+      if (newTotal > prevBetLevel) {
+        const raiseSize = newTotal - prevBetLevel;
+        if (raiseSize >= state.minRaise) {
+          state.minRaise = Math.max(state.minRaise, raiseSize);
+          state.currentBet = newTotal;
+          state.lastAggressor = pid;
+          state.acted = new Set([pid]);
+        } else {
+          // 最小レイズ未満のオールイン: ベットレベルは上がるがレイズ再オープンはしない
+          state.currentBet = newTotal;
+          state.acted.add(pid);
+        }
+      } else {
+        // コール不足のオールイン（部分コール）
+        state.acted.add(pid);
       }
     }
 
@@ -520,6 +547,7 @@
   btnCheck.addEventListener('click', () => playerAction(0,'check'));
   btnCall.addEventListener('click', () => playerAction(0,'call'));
   btnRaise.addEventListener('click', () => playerAction(0,'raise', Number(raiseAmt.value)));
+  btnAllin.addEventListener('click', () => playerAction(0,'allin'));
 
   // 初期表示
   renderAll();
