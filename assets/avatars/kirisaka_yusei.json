@@ -1,0 +1,31 @@
+{
+  "id": "kirisaka_yusei",
+  "name": "霧坂 悠聖",
+  "name_en": "Yusei",
+  "kana": "きりさか ゆうせい",
+  "affiliation": "（学園代表／カード部）",
+  "personality": "物静かで気配が薄い。慎重だが決断は速い",
+  "ability": {
+    "name": "瞬間移動",
+    "kana": "しゅんかんいどう",
+    "meaning": "自分の手札1枚を、山札の別のカードとすり替える。",
+    "effect_text": "対象の手札1枚を選び、山札から1枚と交換する（最大3回/試合）。交換先はゲーム側のルールに従う。"
+  },
+  "background": "悠聖は物静かで、気づけばそこにいる。幼い頃から使い慣れた“瞬間移動”の力を、いまは人を助けるために使う。顧問の失踪に偶然触れた彼は、導かれるように学園代表としてカードを握った。",
+  "rules": {
+    "type": "active",
+    "target": "self-card",
+    "target_priority": "selected-card",
+    "timing": "any-action",
+    "activation": "manual",
+    "duration": "instant",
+    "max_uses": 3,
+    "reset": "per-match",
+    "cost": null,
+    "cooldown": null,
+    "counterplay": null,
+    "notes": "交換は即時に適用される。オールイン公開時など公開情報はゲーム側に従って更新される。"
+  },
+  "tags": ["瞬間移動", "交換", "物静か", "ハンド操作"]
+}
+

@@ -1,0 +1,31 @@
+{
+  "id": "sakuraba_yurin",
+  "name": "桜庭 柚凛",
+  "name_en": "Yurin",
+  "kana": "さくらば ゆりん",
+  "affiliation": "（学園代表／カード部）",
+  "personality": "強気で挑発的。勝負勘が鋭く、攻めを好む",
+  "ability": {
+    "name": "透視",
+    "kana": "とうし",
+    "meaning": "相手の手札を見抜く。各相手から1〜2枚を可視化する。",
+    "effect_text": "各ラウンド1回、全ての対戦相手に対して手札の表示状態を1〜2枚分強制的に公開させる（最大3回/試合）。劣勢時は2枚公開の発生率が上昇する。"
+  },
+  "background": "負けず嫌いで挑発も辞さない柚凛は、片目のスコープで相手の隠し事を暴く。顧問が姿を消した手掛かりを追ううち、彼女は“暴いて勝つ”覚悟を決め、学園代表としてテーブルに立った。",
+  "rules": {
+    "type": "active",
+    "target": "opponents-multi",
+    "target_priority": "all-opponents",
+    "timing": "per-street-1",
+    "activation": "manual",
+    "duration": "1-street",
+    "max_uses": 3,
+    "reset": "per-match",
+    "cost": null,
+    "cooldown": null,
+    "counterplay": null,
+    "notes": "同一ラウンド（ストリート）中は1回まで。既に公開済みのカードは対象外／または不足分のみ公開される。"
+  },
+  "tags": ["透視", "情報暴き", "強気", "可視化"]
+}
+

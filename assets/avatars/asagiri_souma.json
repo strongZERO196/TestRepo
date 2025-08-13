@@ -1,0 +1,31 @@
+{
+  "id": "asagiri_souma",
+  "name": "朝霧 湊真",
+  "name_en": "Souma",
+  "kana": "あさぎり そうま",
+  "affiliation": "（学園代表／カード部）",
+  "personality": "冷静沈着で無表情。観察と判断が早い",
+  "ability": {
+    "name": "未来視",
+    "kana": "みらいし",
+    "meaning": "次に公開されるボードカードを最大3枚まで予見する。",
+    "effect_text": "発動すると、次に公開されるコミュニティカードを最大3枚まで順に表示し、記憶に保存する（最大3回/試合）。"
+  },
+  "background": "湊真は感情をあまり表に出さないが、カードを前にすると数秒先の情景が見えるという。顧問失踪の断片を目にした彼は、未来が定まるのか変えられるのかを確かめるため、学園代表として静かに勝負の席に着いた。",
+  "rules": {
+    "type": "active",
+    "target": "board-sequence",
+    "target_priority": "next-cards",
+    "timing": "any-action",
+    "activation": "manual",
+    "duration": "instant",
+    "max_uses": 3,
+    "reset": "per-match",
+    "cost": null,
+    "cooldown": null,
+    "counterplay": null,
+    "notes": "予見は情報のみで盤面を直接変更しない。ゲームの配布順が変化した場合（他効果等）に内容がずれる可能性がある。"
+  },
+  "tags": ["未来視", "先読み", "冷静", "情報優位"]
+}
+

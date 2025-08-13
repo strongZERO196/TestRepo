@@ -1,0 +1,31 @@
+{
+  "id": "minase_satsuki",
+  "name": "水瀬 紗月",
+  "name_en": "Satsuki",
+  "kana": "みなせ さつき",
+  "affiliation": "（学園代表／カード部）",
+  "personality": "おしとやかで穏やか。幸運を呼び寄せる",
+  "ability": {
+    "name": "幸運の加護",
+    "kana": "こううんのかご",
+    "meaning": "次の配布で役が揃いやすくなる“強効果”と、その後1ストリートだけ残る“弱効果”。",
+    "effect_text": "発動後、次のカード配布で自分に有利な乱数の偏り（強効果）。以降1ストリートは残滓として弱効果が続く（最大3回/試合）。"
+  },
+  "background": "紗月の周囲では不思議と良い偶然が重なる。“幸運の加護”と呼ばれるそれは、引くべきカードを自然と引き寄せる力。顧問の失踪を暗示する夢を見た夜、彼女はその幸運を賭ける覚悟を決めた。",
+  "rules": {
+    "type": "active",
+    "target": "self",
+    "target_priority": "self-first",
+    "timing": "before-deal",
+    "activation": "manual",
+    "duration": "1-hand",
+    "max_uses": 3,
+    "reset": "per-match",
+    "cost": null,
+    "cooldown": null,
+    "counterplay": null,
+    "notes": "強効果は次の配布にのみ適用。弱効果（残滓）は以降1ストリートに限定。複数効果の競合はゲーム側ルールに従う。"
+  },
+  "tags": ["幸運", "加護", "乱数補正", "引き寄せ"]
+}
+
