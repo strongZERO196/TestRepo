@@ -1,8 +1,8 @@
 {
   "id": "sakuraba_yurin",
   "name": "桜庭 柚凛",
-  "name_en": "Yurin",
-  "kana": "さくらば ゆりん",
+  "name_en": "Yuri",
+  "kana": "さくらば ゆり",
   "affiliation": "（学園代表／カード部）",
   "personality": "強気で挑発的。勝負勘が鋭く、攻めを好む",
   "ability": {
@@ -28,4 +28,3 @@
   },
   "tags": ["透視", "情報暴き", "強気", "可視化"]
 }
-

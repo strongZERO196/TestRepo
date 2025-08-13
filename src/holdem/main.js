@@ -329,7 +329,7 @@
   // キャラクター定義
   const CHARACTERS = [
     { key: 'souma', name: '朝霧 湊真', gender: 'male',   avatar: "../../assets/avatars/player-1.png", pose: "../../assets/avatars/souma-full.png", ability: { key:'foresight', name:'未来視', desc:'次に公開されるボードカードを最大3枚まで透視（3回まで）', maxUses:3 } },
-    { key: 'yurin', name: '桜庭 柚凛', gender: 'female', avatar: "../../assets/avatars/player-0.png", pose: "../../assets/avatars/yuri-full.png", ability: { key:'clairvoyance', name:'透視', desc:'各ラウンド1回まで発動可。全プレイヤーの手札から各1〜2枚を可視化（通常は50%で2枚、劣勢時は確率上昇／3回まで）', maxUses:3 } },
+    { key: 'yuri', name: '桜庭 柚凛', gender: 'female', avatar: "../../assets/avatars/player-0.png", pose: "../../assets/avatars/yuri-full.png", ability: { key:'clairvoyance', name:'透視', desc:'各ラウンド1回まで発動可。全プレイヤーの手札から各1〜2枚を可視化（通常は50%で2枚、劣勢時は確率上昇／3回まで）', maxUses:3 } },
     { key: 'yusei', name: '霧坂 悠聖', gender: 'male',   avatar: "../../assets/avatars/player-2.png", pose: "../../assets/avatars/yusei-full.png", ability: { key:'teleport', name:'瞬間移動', desc:'自分の手札の1枚をすり替える（3回まで）', maxUses:3 } },
     { key: 'satsuki', name: '水瀬 紗月', gender: 'female', avatar: "../../assets/avatars/player-3.png", pose: "../../assets/avatars/satsuki-full.png", ability: { key:'blessing', name:'幸運の加護', desc:'発動後、次のターンで役が揃いやすくなる（3回まで）', maxUses:3 } },
   ];
@@ -360,7 +360,7 @@
         '——こうして彼は、学園の代表としてカードを握ることを選んだ。'
       ]
     },
-    yurin: {
+    yuri: {
       title: '桜庭 柚凛 — 強気・挑発的／透視',
       paras: [
         '柚凛は負けず嫌いで、口喧嘩なら相手が誰であろうと退かない。挑発も容赦ないが、それは彼女の自信の表れでもある。',
