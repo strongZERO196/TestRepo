@@ -328,6 +328,7 @@
 
   // キャラクター定義（JSONから読み込み）
   let CHARACTERS = [];
+  let charactersLoadedPromise = null;
   async function loadCharactersFromJson() {
     try {
       const manifestUrl = '../../assets/avatars/manifest.json';
@@ -424,9 +425,12 @@
     if (!layer) return;
     const cards = layer.querySelectorAll('.char-card');
     cards.forEach(btn => {
-      const choose = (ev) => {
+      const choose = async (ev) => {
         // ストーリーボタンは選択を阻害
         if (ev.target && ev.target.closest && ev.target.closest('.btn-char-story')) return;
+        if (!CHARACTERS.length) {
+          try { await (charactersLoadedPromise || loadCharactersFromJson()); } catch(_) {}
+        }
         const key = btn.getAttribute('data-char');
         const chosen = CHARACTERS.find(c => c.key === key);
         if (!chosen) return;
@@ -452,12 +456,15 @@
       btn.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); choose(e);} });
     });
     // クリック委譲の保険
-    layer.addEventListener('click', (e) => {
+    layer.addEventListener('click', async (e) => {
       // ストーリーボタン
       const storyBtn = e.target.closest('.btn-char-story');
       if (storyBtn && layer.contains(storyBtn)) {
         const key = storyBtn.getAttribute('data-char');
         const data = CHAR_STORIES[key];
+        if (!CHARACTERS.length) {
+          try { await (charactersLoadedPromise || loadCharactersFromJson()); } catch(_) {}
+        }
         const modal = document.getElementById('story-modal');
         const char = CHARACTERS.find(c => c.key === key);
         if (modal) {
@@ -493,6 +500,8 @@
               if (extra.length) {
                 extra.forEach(t => { const p = document.createElement('p'); p.textContent = `・${t}`; abilitySec.appendChild(p); });
               }
+            } else {
+              const p0 = document.createElement('p'); p0.textContent = '能力情報を読み込み中、または見つかりませんでした。'; abilitySec.appendChild(p0);
             }
             body.appendChild(abilitySec);
           }
@@ -2082,9 +2091,8 @@
   btnAllin.addEventListener('click', () => playerAction(0,'allin'));
 
   // 初期表示
-  // キャラクターをJSONから事前読み込み
-  loadCharactersFromJson().then(() => {
-    // 読み込み完了ログ（必要に応じてUI同期などを行う）
+  // キャラクターをJSONから事前読み込み（以降のハンドラでawait可能に）
+  charactersLoadedPromise = loadCharactersFromJson().then(() => {
     try { console.log('CHARACTERS loaded:', CHARACTERS.map(c=>c.key).join(',')); } catch(_) {}
   });
   setupTitleScreen();
