@@ -9,6 +9,31 @@
   <body>
     <div class="wrap">
       <h1>テキサスホールデム</h1>
+      <!-- キャラクター選択モーダル -->
+      <div id="char-select" class="char-select" aria-modal="true" role="dialog">
+        <div class="char-panel">
+          <h2>キャラクターを選択</h2>
+          <p class="hint">4人の中から1人を選んでください</p>
+          <div class="char-grid">
+            <button class="char-card" data-char="souma">
+              <div class="char-avatar" style="background-image:url('../../assets/avatars/player-1.png')"></div>
+              <div class="char-meta"><strong>朝霧 湊真</strong><span>未来視:<br>次に公開されるボードカードを最大3枚まで透視（3回まで）</span></div>
+            </button>
+            <button class="char-card" data-char="yurin">
+              <div class="char-avatar" style="background-image:url('../../assets/avatars/player-0.png')"></div>
+              <div class="char-meta"><strong>桜庭 柚凛</strong><span>透視:<br>全プレイヤーの手札から1枚ずつをハンド終了まで可視化（3回まで）</span></div>
+            </button>
+            <button class="char-card" data-char="yusei">
+              <div class="char-avatar" style="background-image:url('../../assets/avatars/player-2.png')"></div>
+              <div class="char-meta"><strong>霧坂 悠聖</strong><span>瞬間移動:<br>自分の手札1枚をすり替える（3回まで）</span></div>
+            </button>
+            <button class="char-card" data-char="satsuki">
+              <div class="char-avatar" style="background-image:url('../../assets/avatars/player-3.png')"></div>
+              <div class="char-meta"><strong>水瀬 紗月</strong><span>幸運の加護:<br>発動後、次のターンで役が揃いやすくなる（3回まで）</span></div>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="grid">
         <div class="left">
           <div class="table" id="table">
@@ -18,37 +43,49 @@
           <div class="seat seat-0" data-seat="0">
             <div class="cards" id="cards-0"></div>
             <div class="info">
-              <div class="name" id="name-0">あなた</div>
-              <div>チップ: <span id="chips-0">0</span></div>
-              <div>ベット: <span id="bet-0">0</span></div>
-              <div class="state" id="state-0"></div>
+              <div class="avatar" id="avatar-0" title="avatar"></div>
+              <div class="meta">
+                <div class="name" id="name-0">あなた</div>
+                <div>チップ: <span id="chips-0">0</span></div>
+                <div>ベット: <span id="bet-0">0</span></div>
+                <div class="state" id="state-0"></div>
+              </div>
             </div>
           </div>
           <div class="seat seat-1" data-seat="1">
             <div class="cards" id="cards-1"></div>
             <div class="info">
-              <div class="name" id="name-1">Bot A</div>
-              <div>チップ: <span id="chips-1">0</span></div>
-              <div>ベット: <span id="bet-1">0</span></div>
-              <div class="state" id="state-1"></div>
+              <div class="avatar" id="avatar-1" title="avatar"></div>
+              <div class="meta">
+                <div class="name" id="name-1">Bot A</div>
+                <div>チップ: <span id="chips-1">0</span></div>
+                <div>ベット: <span id="bet-1">0</span></div>
+                <div class="state" id="state-1"></div>
+              </div>
             </div>
           </div>
           <div class="seat seat-2" data-seat="2">
             <div class="cards" id="cards-2"></div>
             <div class="info">
-              <div class="name" id="name-2">Bot B</div>
-              <div>チップ: <span id="chips-2">0</span></div>
-              <div>ベット: <span id="bet-2">0</span></div>
-              <div class="state" id="state-2"></div>
+              <div class="avatar" id="avatar-2" title="avatar"></div>
+              <div class="meta">
+                <div class="name" id="name-2">Bot B</div>
+                <div>チップ: <span id="chips-2">0</span></div>
+                <div>ベット: <span id="bet-2">0</span></div>
+                <div class="state" id="state-2"></div>
+              </div>
             </div>
           </div>
           <div class="seat seat-3" data-seat="3">
             <div class="cards" id="cards-3"></div>
             <div class="info">
-              <div class="name" id="name-3">Bot C</div>
-              <div>チップ: <span id="chips-3">0</span></div>
-              <div>ベット: <span id="bet-3">0</span></div>
-              <div class="state" id="state-3"></div>
+              <div class="avatar" id="avatar-3" title="avatar"></div>
+              <div class="meta">
+                <div class="name" id="name-3">Bot C</div>
+                <div>チップ: <span id="chips-3">0</span></div>
+                <div>ベット: <span id="bet-3">0</span></div>
+                <div class="state" id="state-3"></div>
+              </div>
             </div>
           </div>
             </div>
@@ -60,6 +97,7 @@
               <button id="btn-new">新しいハンド</button>
               <span id="street"></span>
               <span id="turn"></span>
+              <span id="blinds"></span>
             </div>
             <div class="row row-actions">
               <button id="btn-fold" disabled>フォールド</button>
@@ -73,6 +111,10 @@
                 <button id="btn-raise" disabled>レイズ</button>
               </label>
             </div>
+            <div class="row row-ability">
+              <button id="btn-ability" disabled>能力</button>
+              <span id="ability-uses" class="muted"></span>
+            </div>
             <div class="row">
               <span>プリセット:</span>
               <button id="rs-min" class="rs">最小</button>
@@ -81,6 +123,16 @@
               <button id="rs-2p" class="rs">2×ポット</button>
               <span style="color:#a7b0bd; font-size:12px;">（R=レイズ入力 / A=オールイン / C=チェック/コール / F=フォールド）</span>
             </div>
+            <div class="row row-peek" id="row-peek" style="display:none;">
+              <span>未来視:</span>
+              <div id="peek" class="peek"></div>
+            </div>
+            <div class="row row-equity">
+              <span>勝率:</span>
+              <span id="equity" class="muted">--</span>
+              <button id="btn-equity">計算</button>
+              <span class="muted" style="font-size:12px;">（現在の公開情報に基づく概算）</span>
+            </div>
             <div class="row">
               <span>ポット内訳:</span>
               <div id="pots" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
@@ -88,6 +140,28 @@
           </div>
         </aside>
         <div class="log" id="log"></div>
+      </div>
+  </div>
+
+    <!-- 能力発動オーバーレイ（未来視） -->
+    <div id="ability-overlay" class="ability-overlay" aria-hidden="true">
+      <div class="ability-burst"><span>未来視</span></div>
+    </div>
+
+    <!-- 透視専用オーバーレイ -->
+    <div id="clairvoyance-overlay" class="vision-overlay" aria-hidden="true">
+      <div class="vision-ring"><span>透視</span></div>
+    </div>
+
+    <!-- カットイン（能力発動時） -->
+    <div id="cutin" class="cutin" aria-hidden="true">
+      <div class="cutin-pose" id="cutin-pose"></div>
+      <div class="cutin-wrap">
+        <div class="cutin-portrait" id="cutin-portrait"></div>
+        <div class="cutin-text">
+          <div class="cutin-name" id="cutin-name"></div>
+          <div class="cutin-ability" id="cutin-ability"></div>
+        </div>
       </div>
     </div>
 
