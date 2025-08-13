@@ -3,34 +3,110 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>テキサスホールデム</title>
+    <title>Psychic Hold'em</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="wrap">
-      <h1>テキサスホールデム</h1>
-      <!-- キャラクター選択モーダル -->
-      <div id="char-select" class="char-select" aria-modal="true" role="dialog">
+      <!-- タイトル画面 -->
+      <div id="title-screen" class="title-screen" aria-modal="true" role="dialog">
+        <div class="title-wrap">
+          <div class="title-main">Psychic Hold'em</div>
+          <div class="title-sub">運命を視る者たちのポーカー</div>
+          <div class="title-buttons">
+            <button id="btn-start" class="btn-primary">ゲーム開始</button>
+            <button id="btn-story" class="btn-secondary">ストーリー</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ストーリーモーダル -->
+      <div id="story-modal" class="story-modal" style="display:none;" aria-hidden="true" role="dialog">
+        <div class="story-panel">
+          <h2>物語</h2>
+          <div class="story-body">
+            <div class="story-section">
+              <h3>放課後の気づき</h3>
+              <p>ごく普通の学園。放課後の校舎の片隅で、４人の生徒は“ある変化”に気づいた。</p>
+              <p>彼らはそれぞれ、思考を研ぎ澄まし、偶然を呼び込み、相手の心を読み、物に触れず力を及ぼす——小さな“超能力”。</p>
+            </div>
+            <div class="story-section">
+              <h3>裏部活「放課後超能力部」</h3>
+              <p>誰にも言えない力。彼らはひっそりと「放課後超能力部」を名乗り、裏部活として集まるようになった。</p>
+              <p>ルールはひとつ。「力は日常を壊さないこと」。</p>
+            </div>
+            <div class="story-section">
+              <h3>失踪と招待状</h3>
+              <p>そんなある日、彼らを見守っていた顧問の先生が、全員集合の連絡を残したまま忽然と姿を消した。</p>
+              <p>机の上には、トランプのジョーカーと一枚の招待状。</p>
+              <div class="story-sep"></div>
+              <p>——《学園対抗ポーカー・トーナメント開催》</p>
+              <p>優勝者には“望む答え”が与えられる。先生の行方の手がかりは、そこにある…らしい。</p>
+            </div>
+            <div class="story-section">
+              <h3>選抜の時</h3>
+              <p>ただし、参加できるのは各学園から１名のみ。</p>
+              <p>４人は迷う。誰が行くべきか。勝てるのは誰か。ルールの中で、力はどこまで許されるのか。</p>
+            </div>
+            <div class="story-section">
+              <h3>テーブルへ</h3>
+              <p>そして決める時が来た。</p>
+              <p>それぞれの想いと、切り札と、覚悟を胸に——</p>
+              <p>運命は、テーブルの上で配られる。</p>
+            </div>
+          </div>
+          <div class="story-actions">
+            <button id="btn-story-close" class="btn-primary">閉じる</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- キャラクター選択モーダル（タイトル後に表示） -->
+      <div id="char-select" class="char-select" aria-modal="true" role="dialog" style="display:none;">
         <div class="char-panel">
           <h2>キャラクターを選択</h2>
           <p class="hint">4人の中から1人を選んでください</p>
           <div class="char-grid">
-            <button class="char-card" data-char="souma">
+            <div class="char-card" data-char="souma" role="button" tabindex="0">
               <div class="char-avatar" style="background-image:url('../../assets/avatars/player-1.png')"></div>
-              <div class="char-meta"><strong>朝霧 湊真</strong><span>未来視:<br>次に公開されるボードカードを最大3枚まで透視（3回まで）</span></div>
-            </button>
-            <button class="char-card" data-char="yurin">
+              <div class="char-meta">
+                <div class="char-head">
+                  <strong>朝霧 湊真</strong>
+                  <button type="button" class="btn-secondary btn-char-story" data-char="souma">詳細</button>
+                </div>
+                <span>未来視:<br>次に公開されるボードカードを最大3枚まで透視（3回まで）</span>
+              </div>
+            </div>
+            <div class="char-card" data-char="yurin" role="button" tabindex="0">
               <div class="char-avatar" style="background-image:url('../../assets/avatars/player-0.png')"></div>
-              <div class="char-meta"><strong>桜庭 柚凛</strong><span>透視:<br>全プレイヤーの手札から1枚ずつをハンド終了まで可視化（3回まで）</span></div>
-            </button>
-            <button class="char-card" data-char="yusei">
+              <div class="char-meta">
+                <div class="char-head">
+                  <strong>桜庭 柚凛</strong>
+                  <button type="button" class="btn-secondary btn-char-story" data-char="yurin">詳細</button>
+                </div>
+                <span>透視:<br>各ラウンド1回まで／全プレイヤーの手札から各1〜2枚を可視化（3回まで）</span>
+              </div>
+            </div>
+            <div class="char-card" data-char="yusei" role="button" tabindex="0">
               <div class="char-avatar" style="background-image:url('../../assets/avatars/player-2.png')"></div>
-              <div class="char-meta"><strong>霧坂 悠聖</strong><span>瞬間移動:<br>自分の手札1枚をすり替える（3回まで）</span></div>
-            </button>
-            <button class="char-card" data-char="satsuki">
+              <div class="char-meta">
+                <div class="char-head">
+                  <strong>霧坂 悠聖</strong>
+                  <button type="button" class="btn-secondary btn-char-story" data-char="yusei">詳細</button>
+                </div>
+                <span>瞬間移動:<br>自分の手札1枚をすり替える（3回まで）</span>
+              </div>
+            </div>
+            <div class="char-card" data-char="satsuki" role="button" tabindex="0">
               <div class="char-avatar" style="background-image:url('../../assets/avatars/player-3.png')"></div>
-              <div class="char-meta"><strong>水瀬 紗月</strong><span>幸運の加護:<br>発動後、次のターンで役が揃いやすくなる（3回まで）</span></div>
-            </button>
+              <div class="char-meta">
+                <div class="char-head">
+                  <strong>水瀬 紗月</strong>
+                  <button type="button" class="btn-secondary btn-char-story" data-char="satsuki">詳細</button>
+                </div>
+                <span>幸運の加護:<br>発動後、次のターンで役が揃いやすくなる（3回まで）</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -161,6 +237,17 @@
         <div class="cutin-text">
           <div class="cutin-name" id="cutin-name"></div>
           <div class="cutin-ability" id="cutin-ability"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ゲームオーバー表示 -->
+    <div id="gameover" class="gameover-screen" aria-hidden="true" style="display:none;">
+      <div class="go-wrap">
+        <div class="go-main">GAME OVER</div>
+        <div class="go-sub">チップが尽きました</div>
+        <div style="margin-top:12px;">
+          <button id="btn-title" class="btn-primary">タイトルに戻る</button>
         </div>
       </div>
     </div>

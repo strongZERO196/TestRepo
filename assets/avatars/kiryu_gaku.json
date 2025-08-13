@@ -1,0 +1,30 @@
+{
+  "id": "kiryu_gaku",
+  "name": "桐生 岳",
+  "name_en": "Gaku",
+  "kana": "きりゅう がく",
+  "affiliation": "白鷹工業高校（ボクシング部）",
+  "personality": "短気で豪胆だが、勝負勘は鋭い",
+  "ability": {
+    "name": "心理封圧",
+    "kana": "しんりふうあつ",
+    "meaning": "相手の心理を掌握し、降りる意志すら封じる。",
+    "effect_text": "発動すると、そのハンド中、対象の相手はフォールドできなくなる。"
+  },
+  "background": "白鷹工業の元全国ボクサー。リングでは相手の心を折ることで勝ち続けた。その心理戦の圧力はカード勝負でも発揮され、封じられた者は勝負のテーブルから逃げ出すことができない。",
+  "rules": {
+    "type": "active",
+    "target": "opponent-single",
+    "target_priority": "player-first",
+    "timing": "any-action",
+    "activation": "manual",
+    "duration": "1-hand",
+    "max_uses": 2,
+    "reset": "per-match",
+    "cost": null,
+    "cooldown": null,
+    "counterplay": null,
+    "notes": "複数効果の競合はゲーム側ルールに従う。"
+  },
+  "tags": ["心理", "圧力", "ボクシング", "フォールド封じ"]
+}

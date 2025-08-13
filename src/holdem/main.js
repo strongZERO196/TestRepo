@@ -17,6 +17,7 @@
   const abilityUsesEl = document.getElementById('ability-uses');
   const tableEl = document.getElementById('table');
   const peekEl = document.getElementById('peek');
+  const gameoverEl = document.getElementById('gameover');
   const showdownInfo = new Map(); // プレイヤーID -> { score, used: Card[] }
   const winnersSet = new Set(); // 勝者のプレイヤーID集合（メイン/サイド含む）
   const boardSoftHL = new Set(); // 全員の使用コミュニティカード（淡色）
@@ -88,7 +89,10 @@
       if (p.out || p.folded || p.id === 0 || p.hand.length !== 2) continue;
       const arr = [];
       if (state.openCards && p.allIn) { arr.push(p.hand[0], p.hand[1]); }
-      else if (p.revealIndex != null) { arr.push(p.hand[p.revealIndex]); }
+      else if ((p.revealMask||0) !== 0) {
+        if (p.revealMask & 1) arr.push(p.hand[0]);
+        if (p.revealMask & 2) arr.push(p.hand[1]);
+      }
       knownOpps.set(p.id, { known: arr, need: 2 - arr.length });
     }
 
@@ -165,8 +169,8 @@
     board: [],
     pot: 0,
     dealer: 0, // ボタン位置
-    sb: 10,
-    bb: 20,
+    sb: 100,
+    bb: 200,
     street: 'idle', // idle, preflop, flop, turn, river, showdown
     toAct: 0, // 行動者のプレイヤーID
     currentBet: 0,
@@ -180,22 +184,26 @@
     openCards: false,
     // キャラ選択
     charSelected: false,
-    // 幸運の加護（次のカード配布を補正する対象プレイヤーID、なければnull）
-    blessingFor: null,
+    // 幸運の加護（強効果: 次の配布で発動する対象／残滓: 以降1ストリートだけ弱効果）
+    blessingStrongFor: null,
+    blessingResidualPid: null,
+    blessingResidualCount: 0,
     // 勝率自動計算用
     equityLastAt: 0,
     equityBusy: false,
+    // 透視（clairvoyance）同一ラウンド内の使用制限（プレイヤーIDを記録）
+    usedClairvoyanceStreet: new Set(),
   };
 
   // ブラインドレベル（短め・合計約5分想定）
   // 各レベル50秒 × 6 = 300秒（5分）
   const BLIND_LEVELS = [
-    { sb: 10,  bb: 20,  dur: 50 },
-    { sb: 20,  bb: 40,  dur: 50 },
-    { sb: 30,  bb: 60,  dur: 50 },
-    { sb: 50,  bb: 100, dur: 50 },
-    { sb: 75,  bb: 150, dur: 50 },
-    { sb: 100, bb: 200, dur: 50 },
+    { sb: 100,  bb: 200,  dur: 50 },
+    { sb: 200,  bb: 400,  dur: 50 },
+    { sb: 300,  bb: 600,  dur: 50 },
+    { sb: 500,  bb: 1000, dur: 50 },
+    { sb: 750,  bb: 1500, dur: 50 },
+    { sb: 1000, bb: 2000, dur: 50 },
   ];
   const BLIND_THRESHOLDS = (() => {
     let acc = 0; const arr = [];
@@ -321,17 +329,69 @@
   // キャラクター定義
   const CHARACTERS = [
     { key: 'souma', name: '朝霧 湊真', gender: 'male',   avatar: "../../assets/avatars/player-1.png", pose: "../../assets/avatars/souma-full.png", ability: { key:'foresight', name:'未来視', desc:'次に公開されるボードカードを最大3枚まで透視（3回まで）', maxUses:3 } },
-    { key: 'yurin', name: '桜庭 柚凛', gender: 'female', avatar: "../../assets/avatars/player-0.png", pose: "../../assets/avatars/yuri-full.png", ability: { key:'clairvoyance', name:'透視', desc:'全プレイヤーの手札から1枚ずつをハンド終了まで可視化（3回まで）', maxUses:3 } },
+    { key: 'yurin', name: '桜庭 柚凛', gender: 'female', avatar: "../../assets/avatars/player-0.png", pose: "../../assets/avatars/yuri-full.png", ability: { key:'clairvoyance', name:'透視', desc:'各ラウンド1回まで発動可。全プレイヤーの手札から各1〜2枚を可視化（通常は50%で2枚、劣勢時は確率上昇／3回まで）', maxUses:3 } },
     { key: 'yusei', name: '霧坂 悠聖', gender: 'male',   avatar: "../../assets/avatars/player-2.png", pose: "../../assets/avatars/yusei-full.png", ability: { key:'teleport', name:'瞬間移動', desc:'自分の手札の1枚をすり替える（3回まで）', maxUses:3 } },
     { key: 'satsuki', name: '水瀬 紗月', gender: 'female', avatar: "../../assets/avatars/player-3.png", pose: "../../assets/avatars/satsuki-full.png", ability: { key:'blessing', name:'幸運の加護', desc:'発動後、次のターンで役が揃いやすくなる（3回まで）', maxUses:3 } },
   ];
 
+  // キャラクター個別ストーリー
+  const CHAR_STORIES = {
+    souma: {
+      title: '朝霧 湊真 — 冷静沈着・無表情／未来視',
+      paras: [
+        '湊真は、感情を表に出すことがほとんどない。クラスで笑いが起きても、沈黙が流れても、その表情は水面のように静かだ。',
+        'しかし放課後の部室でカードを手にするときだけ、瞳がわずかに揺れる。そこには、ほんの数秒先の情景が映る',
+        '——まだ配られていないカード、相手が出す手、わずかな仕草。',
+        '顧問が失踪したあの日、湊真は未来の断片を見た。机から滑り落ちるジョーカー、その先に広がるポーカーテーブル。',
+        '未来は変えられるのか、それとも定められているのか。',
+        '答えを確かめるために、湊真は静かに席を立つ。',
+        '——こうして彼は、学園の代表として勝負の場に向かう決意をした。'
+      ]
+    },
+    yusei: {
+      title: '霧坂 悠聖 — おとなしい／瞬間移動',
+      paras: [
+        '悠聖は、常に物静かで、気配すら薄い。「あれ、さっきまでいなかったよな？」と驚かれることも珍しくない。',
+        '彼の力は瞬間移動。幼い頃は遊び半分で使っていたが、人を助けるために使うようになったのは最近のことだった。',
+        '顧問が消えた日、悠聖はふと職員室を通りかかった。',
+        '机の上に置かれたトランプと招待状——次の瞬間、それは自分の手の中にあった。無意識に“飛んで”しまったのだ。',
+        '偶然か、それとも導かれたのか。',
+        '悠聖は静かに息を整えると、仲間の視線を受け止めた。',
+        '——こうして彼は、学園の代表としてカードを握ることを選んだ。'
+      ]
+    },
+    yurin: {
+      title: '桜庭 柚凛 — 強気・挑発的／透視',
+      paras: [
+        '柚凛は負けず嫌いで、口喧嘩なら相手が誰であろうと退かない。挑発も容赦ないが、それは彼女の自信の表れでもある。',
+        '片目に浮かぶ赤いスコープは、相手の隠し事を暴く透視の力。小さな秘密も、彼女の視線からは逃れられない。',
+        '顧問が姿を消した翌日、柚凛は部室のロッカーに隠されていた写真を見つけた。そこには、見知らぬ街のポーカーテーブルで笑う顧問の姿があった。',
+        '「アンタの隠してることも、先生の居場所も、全部暴いてやる」',
+        '赤い視界に燃えるような光が宿る。',
+        '——こうして彼女は、学園の代表として勝負の席に着くことを決めた。'
+      ]
+    },
+    satsuki: {
+      title: '水瀬 紗月 — おしとやか・運命の引き／幸運の加護',
+      paras: [
+        '紗月は柔らかな物腰の少女だが、その周囲では不思議と良い偶然が重なる。失くした物がすぐ見つかる、',
+        '偶然の出会いが助けになる——まるで運命が味方しているかのように。',
+        'それは彼女の“幸運の加護”と呼ばれる力。意識せずとも、引くべきカードを引き寄せてしまう。',
+        '顧問が失踪した夜、紗月は夢を見た。暗い会場で配られるカード、勝利を告げる役、その後ろに立つ顧問の姿。',
+        'それがただの夢か、それとも未来の兆しか——紗月は迷わなかった。',
+        '——こうして彼女は、学園の代表としてその幸運を賭ける道を選んだ。'
+      ]
+    }
+  };
+
   function setupCharacterSelection() {
     const layer = document.getElementById('char-select');
     if (!layer) return;
-    const buttons = layer.querySelectorAll('.char-card');
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
+    const cards = layer.querySelectorAll('.char-card');
+    cards.forEach(btn => {
+      const choose = (ev) => {
+        // ストーリーボタンは選択を阻害
+        if (ev.target && ev.target.closest && ev.target.closest('.btn-char-story')) return;
         const key = btn.getAttribute('data-char');
         const chosen = CHARACTERS.find(c => c.key === key);
         if (!chosen) return;
@@ -352,10 +412,60 @@
         loadAvatars();
         renderAll();
         layer.style.display = 'none';
-      });
+      };
+      btn.addEventListener('click', choose);
+      btn.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); choose(e);} });
     });
     // クリック委譲の保険
     layer.addEventListener('click', (e) => {
+      // ストーリーボタン
+      const storyBtn = e.target.closest('.btn-char-story');
+      if (storyBtn && layer.contains(storyBtn)) {
+        const key = storyBtn.getAttribute('data-char');
+        const data = CHAR_STORIES[key];
+        const modal = document.getElementById('story-modal');
+        const char = CHARACTERS.find(c => c.key === key);
+        if (modal) {
+          const h2 = modal.querySelector('h2');
+          const body = modal.querySelector('.story-body');
+          if (h2) h2.textContent = (data && data.title) ? data.title : (char ? char.name : '詳細');
+          if (body) {
+            body.innerHTML = '';
+            // ストーリー
+            if (data && Array.isArray(data.paras)) {
+              const storySec = document.createElement('div');
+              storySec.className = 'story-section';
+              const h3 = document.createElement('h3'); h3.textContent = 'ストーリー'; storySec.appendChild(h3);
+              data.paras.forEach(t => { const p = document.createElement('p'); p.textContent = t; storySec.appendChild(p); });
+              body.appendChild(storySec);
+            }
+            // 能力詳細
+            const abilitySec = document.createElement('div');
+            abilitySec.className = 'story-section';
+            const h3b = document.createElement('h3'); h3b.textContent = '能力の詳細'; abilitySec.appendChild(h3b);
+            const ab = char && char.ability;
+            const notesByKey = {
+              foresight: ['ボード未完成時のみ使用可', '次に公開されるカードを最大3枚まで確認', '可視化は使用者のみ（相手には非公開）'],
+              clairvoyance: ['相手全員の手札から各1枚を可視化', '1人につき1枚のみ（同ハンド中保持）', '可視化は使用者のみ有利な情報'],
+              teleport: ['自分の手札1枚のみすり替え可能', 'リバーのボードは対象外', '山札から有利になりやすいカードを選定'],
+              blessing: ['このハンド中持続（同一ハンドで連続発動不可）', '次の配布カードが有利になりやすい']
+            };
+            if (ab) {
+              const p1 = document.createElement('p'); p1.innerHTML = `<strong>能力:</strong> ${ab.name}`; abilitySec.appendChild(p1);
+              const p2 = document.createElement('p'); p2.innerHTML = `<strong>効果:</strong> ${ab.desc}`; abilitySec.appendChild(p2);
+              const p3 = document.createElement('p'); p3.innerHTML = `<strong>使用回数:</strong> ${ab.maxUses} 回`; abilitySec.appendChild(p3);
+              const extra = notesByKey[ab.key] || [];
+              if (extra.length) {
+                extra.forEach(t => { const p = document.createElement('p'); p.textContent = `・${t}`; abilitySec.appendChild(p); });
+              }
+            }
+            body.appendChild(abilitySec);
+          }
+          modal.style.display = 'grid';
+          modal.setAttribute('aria-hidden','false');
+        }
+        return; // キャラ選択はしない
+      }
       const card = e.target.closest('.char-card');
       if (!card || !layer.contains(card)) return;
       const key = card.getAttribute('data-char');
@@ -377,6 +487,38 @@
       renderAll();
       layer.style.display = 'none';
     });
+  }
+
+  function setupTitleScreen() {
+    const title = document.getElementById('title-screen');
+    const charSel = document.getElementById('char-select');
+    const story = document.getElementById('story-modal');
+    const btnStart = document.getElementById('btn-start');
+    const btnStory = document.getElementById('btn-story');
+    const btnStoryClose = document.getElementById('btn-story-close');
+    if (!title || !charSel) return;
+    const start = () => {
+      title.style.display = 'none';
+      charSel.style.display = 'grid';
+    };
+    // 画面クリックでも開始（既存挙動を維持）
+    title.addEventListener('click', (e) => {
+      // ボタンのクリックはここで扱わない
+      const onButton = e.target.closest('button');
+      if (onButton) return;
+      start();
+    });
+    if (btnStart) btnStart.addEventListener('click', (e) => { e.stopPropagation(); start(); });
+    if (btnStory) btnStory.addEventListener('click', (e) => { e.stopPropagation(); if (story) { story.style.display = 'grid'; story.setAttribute('aria-hidden','false'); } });
+    if (btnStoryClose) btnStoryClose.addEventListener('click', () => { if (story) { story.style.display = 'none'; story.setAttribute('aria-hidden','true'); } });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') start(); }, { once: true });
+  }
+
+  function showGameOver() {
+    if (gameoverEl) {
+      gameoverEl.style.display = 'grid';
+      gameoverEl.setAttribute('aria-hidden','false');
+    }
   }
 
   // カットイン表示
@@ -419,7 +561,7 @@
   let abilityCardClickHandler = null; // テレポート用クリックハンドラ
 
   function eligibleClairvoyanceTargets() {
-    return players.filter(p => !p.isUser && !p.out && !p.folded && p.hand.length === 2 && (p.revealIndex == null));
+    return players.filter(p => !p.isUser && !p.out && !p.folded && p.hand.length === 2 && ((p.revealMask||0) !== 3));
   }
 
   function startClairvoyanceTargeting() {
@@ -457,12 +599,12 @@
       const pidStr = seat.getAttribute('data-seat');
       const pid = Number(pidStr);
       const target = players[pid];
-      if (!target || target.isUser || target.out || target.folded || (target.revealIndex != null)) return;
+      if (!target || target.isUser || target.out || target.folded || ((target.revealMask||0)===3)) return;
       // 発動
       me.ability.uses -= 1;
       // 2枚のうち1枚だけを公開（同一相手への再発動は不可）
       const idx = Math.random() < 0.5 ? 0 : 1;
-      target.revealIndex = idx;
+      target.revealMask = (target.revealMask||0) | (idx===0?1:2);
       // 演出
       const overlay2 = document.getElementById('clairvoyance-overlay');
       if (overlay2) {
@@ -480,7 +622,7 @@
         const onEnd = () => { abilityRow.classList.remove('flash'); abilityRow.removeEventListener('animationend', onEnd); };
         abilityRow.addEventListener('animationend', onEnd);
       }
-      const rc = target.hand[target.revealIndex];
+      const rc = target.hand[idx];
       const label = `${rankLabel(rc.r)}${rc.s}`;
       log(`透視: ${target.name} の手札の一部 → ${label}`);
       renderAll();
@@ -668,23 +810,44 @@
       return;
     }
     if (me.ability.key === 'clairvoyance') {
-      // 全プレイヤーから未公開の1枚を可視化
-      const changed = [];
-      const targets = players.filter(p => !p.isUser && !p.out && p.hand.length === 2 && (p.revealIndex == null));
-      if (targets.length === 0) { log('透視: 新たに可視化できる相手がいません'); return; }
+      // 同一ラウンド中は1回まで
+      if (state.usedClairvoyanceStreet.has(0)) { log('透視: このラウンドでは既に使用しました'); return; }
+      // 全プレイヤー（相手）を対象に各1枚可視化
+      const eligible = players.filter(p => !p.isUser && !p.out && p.hand.length === 2 && ((p.revealMask||0) !== 3));
+      if (eligible.length === 0) { log('透視: 新たに可視化できる相手がいません'); return; }
+      const chosenTargets = eligible; // 全員対象
       me.ability.uses -= 1;
+      state.usedClairvoyanceStreet.add(0);
       // エフェクト
       const overlay2 = document.getElementById('clairvoyance-overlay');
       if (overlay2) { overlay2.classList.add('show'); setTimeout(() => overlay2.classList.remove('show'), 860); }
       showCutIn('clairvoyance', me.name, me.ability?.name || '透視', me.avatar, me.pose);
       // 可視化処理
+      const changed = [];
       const revealPairs = [];
-      targets.forEach(t => {
-        const idx = Math.random() < 0.5 ? 0 : 1;
-        t.revealIndex = idx;
-        changed.push({ pid: t.id, idx });
-        const rc = t.hand[idx];
-        revealPairs.push(`${t.name}:${rankLabel(rc.r)}${rc.s}`);
+      chosenTargets.forEach(t => {
+        let mask = t.revealMask||0;
+        // 点数差による2枚化バイアス（通常は50%で2枚、劣勢時は上方修正）
+        let wantTwo = false;
+        try {
+          const eq = estimateEquity(200).win; // 軽量
+          const probTwo = eq < 0.5 ? 0.8 : 0.5; // 劣勢時は2枚の確率を上げる
+          wantTwo = Math.random() < probTwo;
+        } catch(_) { wantTwo = Math.random() < 0.5; }
+        if (mask===0) {
+          if (wantTwo) { mask = 3; changed.push({pid:t.id, idx:0}); changed.push({pid:t.id, idx:1}); }
+          else { const idx = (Math.random()<0.5?0:1); mask = (idx===0?1:2); changed.push({pid:t.id, idx}); }
+        } else if (mask===1 || mask===2) {
+          const missing = (mask===1?2:1);
+          if (wantTwo) { mask = 3; changed.push({pid:t.id, idx: (missing===1?0:1)}); }
+          // 既に1枚は見えているので必ず1枚以上は新規開示される
+        }
+        t.revealMask = mask;
+        // ログ用: 現在見えているカードを列挙
+        const names = [];
+        if (mask&1) names.push(`${rankLabel(t.hand[0].r)}${t.hand[0].s}`);
+        if (mask&2) names.push(`${rankLabel(t.hand[1].r)}${t.hand[1].s}`);
+        revealPairs.push(`${t.name}:${names.join('&')}`);
       });
       log(`透視: ${revealPairs.join(' / ')}`);
       renderAll();
@@ -709,9 +872,11 @@
     }
     if (me.ability.key === 'blessing') {
       if (state.board.length >= 5) return;
-      if (state.blessingFor != null) return; // このハンドでは既に発動済み
+      // このハンドでは強効果が未使用のときのみ
+      if (state.blessingStrongFor != null) return;
       me.ability.uses -= 1;
-      state.blessingFor = 0;
+      state.blessingStrongFor = 0; // 次の配布で強効果
+      // 残滓は goNextStreet で自動設定（1ストリート分の弱効果）
       log('幸運の加護: 次のカードが味方する…');
       showCutIn('blessing', me.name, me.ability.name, me.avatar, me.pose);
       // 能力行のハイライト
@@ -733,6 +898,9 @@
     potEl.textContent = String(state.pot);
     streetEl.textContent = `ステージ: ${state.street}`;
     turnEl.textContent = state.street === 'idle' ? '' : `次の行動: ${players[state.toAct]?.name ?? ''}`;
+    // ゲーム未開始（idle）かつキャラ未選択のときは座席UIを非表示
+    const seatsWrap = document.querySelector('.seats');
+    if (seatsWrap) seatsWrap.style.display = (state.charSelected || state.street !== 'idle') ? 'block' : 'none';
     // ブラインド表示（次レベルまでの残り時間も表示）
     if (blindsEl) {
       const now = Date.now();
@@ -748,16 +916,21 @@
     }
     // ボード
     boardEl.innerHTML = '';
-    state.board.forEach((c, i) => {
-      const el = cardEl(c, true);
-      if (state.street === 'showdown') {
-        if (boardStrongHL.has(c)) el.classList.add('hl-strong');
-        // 敗者の使用カードは強調しない（hl-softは使用しない）
-      }
-      el.dataset.boardIndex = String(i);
-      el.classList.add('board-card');
-      boardEl.appendChild(el);
-    });
+    if (state.board.length === 0) {
+      boardEl.style.display = 'none';
+    } else {
+      boardEl.style.display = 'flex';
+      state.board.forEach((c, i) => {
+        const el = cardEl(c, true);
+        if (state.street === 'showdown') {
+          if (boardStrongHL.has(c)) el.classList.add('hl-strong');
+          // 敗者の使用カードは強調しない（hl-softは使用しない）
+        }
+        el.dataset.boardIndex = String(i);
+        el.classList.add('board-card');
+        boardEl.appendChild(el);
+      });
+    }
     // 各席
     for (const p of players) {
       const seatEl = document.querySelector('.seat-' + p.id);
@@ -775,9 +948,9 @@
       const showSeat = (!p.out) || participated; // ショーダウン参加者は離脱後も表示
       // 公開条件: ユーザー or ショーダウン or （オールイン公開フラグON かつ 当該プレイヤーがオールイン）
       const showBoth = (p.isUser || showdownInfo.has(p.id) || (state.street !== 'idle' && state.openCards && p.allIn)) && showSeat;
-      const revealIdx = p.revealIndex;
-      const face0 = showSeat && (showBoth || revealIdx === 0);
-      const face1 = showSeat && (showBoth || revealIdx === 1);
+      const rmask = p.revealMask || 0;
+      const face0 = showSeat && (showBoth || (rmask & 1));
+      const face1 = showSeat && (showBoth || (rmask & 2));
       if (p.hand.length && showSeat) {
         const c0 = cardEl(p.hand[0], face0);
         const c1 = cardEl(p.hand[1], face1);
@@ -834,10 +1007,10 @@
       }
       // 透視中バッジ（相手に対して付与）
       const st2 = $('state-' + p.id);
-      if ((p.revealIndex != null) && state.street !== 'showdown') {
+      if ((p.revealMask||0) > 0 && state.street !== 'showdown') {
         const span = document.createElement('span');
         span.className = 'badge-action is-raise';
-        span.textContent = '透視中(1枚)';
+        span.textContent = (rmask===3) ? '透視中(2枚)' : '透視中(1枚)';
         st2.appendChild(span);
       }
     }
@@ -930,7 +1103,7 @@
           canUse = hasUses && stageOK && hasTarget && !state.abilityTargeting;
         } else if (me.ability.key === 'blessing') {
           const stageOK = state.street !== 'idle' && state.street !== 'showdown' && state.board.length < 5;
-          const notActive = (state.blessingFor == null); // このハンドで未発動のときのみ
+          const notActive = (state.blessingStrongFor == null); // このハンドで未発動のときのみ
           canUse = hasUses && stageOK && notActive && !state.abilityTargeting;
         }
         if (abilityUsesEl) abilityUsesEl.textContent = hasUses ? `残り ${me.ability.uses} 回` : '残り 0 回';
@@ -962,6 +1135,8 @@
     if (alivePlayersCount() < 2) {
       state.street = 'idle';
       log('ゲーム終了：残り参加者が1人以下です');
+      const me = players[0];
+      if (me.out || me.chips <= 0) showGameOver();
       renderAll();
       return;
     }
@@ -983,13 +1158,16 @@
     state.minRaise = state.bb;
     state.lastAggressor = null;
     state.acted = new Set();
-    state.blessingFor = null; // ハンド開始時に解除
+    state.blessingStrongFor = null;
+    state.blessingResidualPid = null;
+    state.blessingResidualCount = 0;
+    state.usedClairvoyanceStreet = new Set();
     if (peekEl) peekEl.innerHTML = '';
     for (const p of players) {
       if (!p.out) {
-        p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealIndex = null;
+        p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealMask = 0;
       } else {
-        p.hand = []; p.folded = true; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealIndex = null;
+        p.hand = []; p.folded = true; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealMask = 0;
       }
     }
     // ボタン移動
@@ -1069,6 +1247,17 @@
     }
   }
 
+  function everyoneAllInOrNoActionLeft() {
+    const active = players.filter(p => !p.folded && !p.out);
+    if (active.length <= 1) return true;
+    if (active.every(p => p.allIn)) return true;
+    if (state.openCards) {
+      // 全員が現在額に揃っているなら、チェックを待たずに先へ
+      if (active.every(p => p.allIn || p.bet === state.currentBet)) return true;
+    }
+    return false;
+  }
+
   function goNextStreet() {
     // ベットをリセット
     for (const p of players) p.bet = 0;
@@ -1078,6 +1267,8 @@
     state.acted = new Set();
     // 直近アクションは次ストリートでクリア
     for (const p of players) { if (!p.folded && !p.out) p.lastAction = null; }
+    // ストリートが進んだら 透視の同一ラウンド制限を解除
+    state.usedClairvoyanceStreet = new Set();
 
     if (players.filter(p => !p.folded && !p.out).length <= 1) {
       showdown();
@@ -1085,17 +1276,20 @@
     }
 
     if (state.street === 'preflop') {
-      // 幸運の加護が有効なら、次に出るカードを有利に並べ替える
-      if (state.blessingFor!=null) applyBlessingBeforeDeal(state.blessingFor, 3);
+      // 幸運の加護（強→残滓）
+      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 3); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
+      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 3); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
       // フロップ 3枚
       state.board.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
       state.street = 'flop';
     } else if (state.street === 'flop') {
-      if (state.blessingFor!=null) applyBlessingBeforeDeal(state.blessingFor, 1);
+      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 1); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
+      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 1); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
       state.board.push(state.deck.pop());
       state.street = 'turn';
     } else if (state.street === 'turn') {
-      if (state.blessingFor!=null) applyBlessingBeforeDeal(state.blessingFor, 1);
+      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 1); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
+      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 1); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
       state.board.push(state.deck.pop());
       state.street = 'river';
     } else if (state.street === 'river') {
@@ -1199,6 +1393,7 @@
 
     // ラウンド終了判定（全アクティブが最新レイズ以降「行動済み」かつ整合）
     updateOpenCardsFlag();
+    if (everyoneAllInOrNoActionLeft()) { renderAll(); setTimeout(goNextStreet, 500); return; }
     const active = players.filter(pp => !pp.folded && !pp.out);
     if (active.length <= 1) { showdown(); return; }
     if (allSettled() && allActedOrUnable()) {
@@ -1273,13 +1468,14 @@
       log(`${potName}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
     });
     state.pot = 0;
-    // チップが尽きたプレイヤーは離脱
+    // チップが尽きたプレイヤーは離脱（ユーザーならゲームオーバー表示）
     for (const p of players) {
       if (!p.out && p.chips <= 0) {
         p.out = true;
         p.folded = true;
         p.allIn = false;
         log(`${p.name}: チップが尽きたため離脱`);
+        if (p.id === 0) showGameOver();
       }
     }
     // 残り人数チェック
@@ -1290,6 +1486,9 @@
       else log('ゲーム終了: 参加者なし');
       // 直後はショーダウン表示を維持して手札を公開したままにする
       // 次のハンド開始時（newHand）で状態をクリアする
+      // プレイヤーが破産していたらゲームオーバー表示
+      const me = players[0];
+      if (me.out || me.chips <= 0) showGameOver();
     }
     renderAll();
   }
@@ -1437,6 +1636,8 @@
 
   // 幸運の加護: 次に配るカードk枚を、有利になるようデッキ末尾付近から強く選ぶ
   function applyBlessingBeforeDeal(forPid, k) {
+    let weak = false;
+    if (typeof forPid === 'object' && forPid) { weak = !!forPid.weak; forPid = forPid.pid; }
     const me = players[forPid];
     if (!me || me.folded || me.out) return;
     if (k <= 0) return;
@@ -1474,7 +1675,7 @@
     function pickOne(tempBoard) {
       if (state.deck.length === 0) return;
       const last = state.deck.length - 1;
-      const winSize = state.deck.length; // デッキ全体から最良を探索してより強力に
+      const winSize = weak ? Math.min(12, state.deck.length) : state.deck.length; // 残滓は控えめに
       const suitFav = targetSuit(tempBoard);
       let bestIdx = last;
       let bestVal = -1;
@@ -1487,15 +1688,15 @@
           val += scoreValue(sc);
           // 成立役カテゴリに応じてさらに加点
           const cat = sc[0] || 0;
-          val += cat * 2000;
+          val += cat * (weak ? 800 : 2000);
         } else {
           // 事前（フロップ前など）はヒューリスティクス重視
           // ペア/スート/連結性を強く優遇
-          if (holeRanks.has(cand.r)) val += 3000;          // ペア形成
-          if (cand.s === suitFav) val += 1200;             // 同スート強化
-          if (biasSet.has(cand.r)) val += 800;             // つながり強化
+          if (holeRanks.has(cand.r)) val += weak ? 1200 : 3000;          // ペア形成
+          if (cand.s === suitFav) val += weak ? 500 : 1200;             // 同スート強化
+          if (biasSet.has(cand.r)) val += weak ? 300 : 800;             // つながり強化
           // A/K/Q など高カードのわずかな加点
-          if (cand.r >= 13) val += 200;
+          if (cand.r >= 13) val += weak ? 80 : 200;
         }
         // 総合
         bestIdx = (val > bestVal) ? idx : bestIdx;
@@ -1758,9 +1959,9 @@
         return true;
       }
     } else if (p.ability.key === 'blessing') {
-      if (state.board.length < 5 && state.blessingFor == null && r < 0.25) {
+      if (state.board.length < 5 && state.blessingStrongFor == null && r < 0.25) {
         p.ability.uses -= 1;
-        state.blessingFor = p.id;
+        state.blessingStrongFor = p.id;
         log(`${p.name}: 能力を発動（幸運の加護）`);
         showCutIn('blessing', p.name, p.ability.name, p.avatar, p.pose);
         p.aggrPulse = (p.aggrPulse||0) + 2;
@@ -1846,7 +2047,10 @@
   btnAllin.addEventListener('click', () => playerAction(0,'allin'));
 
   // 初期表示
+  setupTitleScreen();
   setupCharacterSelection();
+  // タイトルに戻る
+  (function(){ const btn = document.getElementById('btn-title'); if (btn) btn.addEventListener('click', ()=> window.location.reload()); })();
   loadAvatars();
   renderAll();
   // 能力ボタンハンドラ
