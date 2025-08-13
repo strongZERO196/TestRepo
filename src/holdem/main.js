@@ -326,13 +326,48 @@
     }
   }
 
-  // キャラクター定義
-  const CHARACTERS = [
-    { key: 'souma', name: '朝霧 湊真', gender: 'male',   avatar: "../../assets/avatars/player-1.png", pose: "../../assets/avatars/souma-full.png", ability: { key:'foresight', name:'未来視', desc:'次に公開されるボードカードを最大3枚まで透視（3回まで）', maxUses:3 } },
-    { key: 'yuri', name: '桜庭 柚凛', gender: 'female', avatar: "../../assets/avatars/player-0.png", pose: "../../assets/avatars/yuri-full.png", ability: { key:'clairvoyance', name:'透視', desc:'各ラウンド1回まで発動可。全プレイヤーの手札から各1〜2枚を可視化（通常は50%で2枚、劣勢時は確率上昇／3回まで）', maxUses:3 } },
-    { key: 'yusei', name: '霧坂 悠聖', gender: 'male',   avatar: "../../assets/avatars/player-2.png", pose: "../../assets/avatars/yusei-full.png", ability: { key:'teleport', name:'瞬間移動', desc:'自分の手札の1枚をすり替える（3回まで）', maxUses:3 } },
-    { key: 'satsuki', name: '水瀬 紗月', gender: 'female', avatar: "../../assets/avatars/player-3.png", pose: "../../assets/avatars/satsuki-full.png", ability: { key:'blessing', name:'幸運の加護', desc:'発動後、次のターンで役が揃いやすくなる（3回まで）', maxUses:3 } },
-  ];
+  // キャラクター定義（JSONから読み込み）
+  let CHARACTERS = [];
+  async function loadCharactersFromJson() {
+    try {
+      const manifestUrl = '../../assets/avatars/manifest.json';
+      const baseUrl = '../../assets/avatars/';
+      const res = await fetch(manifestUrl);
+      const files = await res.json();
+      const loaded = [];
+      for (const f of files) {
+        try {
+          const r = await fetch(baseUrl + f);
+          const data = await r.json();
+          if (!data || !data.key || !data.ability) continue; // 選択キャラ要件を満たすもののみ
+          loaded.push({
+            key: data.key,
+            name: data.name || data.id || data.key,
+            gender: data.gender || 'unknown',
+            avatar: data.avatar || '',
+            pose: data.pose || data.avatar || '',
+            ability: {
+              key: data.ability.key || '',
+              name: data.ability.name || '',
+              desc: data.ability.desc || data.ability.effect_text || '',
+              maxUses: data.ability.maxUses || 3,
+            },
+          });
+        } catch (_) { /* 個別読み込み失敗は無視 */ }
+      }
+      // ゲーム内既定の4キャラのみを優先順に整列（存在すれば）
+      const order = ['souma', 'yuri', 'yusei', 'satsuki'];
+      loaded.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+      // 未知キーは末尾へ
+      const preferred = loaded.filter(c => order.includes(c.key));
+      const others = loaded.filter(c => !order.includes(c.key));
+      CHARACTERS = [...preferred, ...others];
+      return CHARACTERS;
+    } catch (e) {
+      console.warn('キャラJSONの読み込みに失敗:', e);
+      return [];
+    }
+  }
 
   // キャラクター個別ストーリー
   const CHAR_STORIES = {
@@ -2047,6 +2082,11 @@
   btnAllin.addEventListener('click', () => playerAction(0,'allin'));
 
   // 初期表示
+  // キャラクターをJSONから事前読み込み
+  loadCharactersFromJson().then(() => {
+    // 読み込み完了ログ（必要に応じてUI同期などを行う）
+    try { console.log('CHARACTERS loaded:', CHARACTERS.map(c=>c.key).join(',')); } catch(_) {}
+  });
   setupTitleScreen();
   setupCharacterSelection();
   // タイトルに戻る
