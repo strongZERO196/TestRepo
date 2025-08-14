@@ -8,6 +8,8 @@ import { bestScoreFrom, compareScore, best5Detailed, decisiveUsedCards, score5 }
 import { speak, setPlayersRef } from './js/ui/speech.js';
 import { loadCharactersFromJson as loadCharacters } from './js/data/characters.js';
 import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } from './js/ui/render.js';
+import { players, state, BLIND_LEVELS, BLIND_THRESHOLDS, desiredBlindLevelIdx, timeToNextLevel, nextActiveFrom, nextNonOutFrom } from './js/core/state.js';
+import { computePots } from './js/engine/pots.js';
 
 (() => {
   'use strict';
@@ -132,14 +134,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
     return div;
   }
 
-  // プレイヤー
-  const players = [
-    { id: 0, name: 'あなた', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: true,  avatar: "../../assets/avatars/player-0.png" },
-    { id: 1, name: 'Bot A', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false, avatar: "../../assets/avatars/player-1.png" },
-    { id: 2, name: 'Bot B', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false, avatar: "../../assets/avatars/player-2.png" },
-    { id: 3, name: 'Bot C', chips: 2000, hand: [], folded: false, bet: 0, total: 0, allIn: false, out: false, isUser: false, avatar: "../../assets/avatars/player-3.png" },
-  ];
-  // セリフモジュールへプレイヤー参照を渡す
+  // プレイヤーは state.js から。セリフモジュールへ参照を注入
   setPlayersRef(players);
 
   // ゲーム状態
@@ -176,20 +171,6 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
 
   // ブラインドレベル（短め・合計約5分想定）
   // 各レベル50秒 × 6 = 300秒（5分）
-  const BLIND_LEVELS = [
-    { sb: 100,  bb: 200,  dur: 50 },
-    { sb: 200,  bb: 400,  dur: 50 },
-    { sb: 300,  bb: 600,  dur: 50 },
-    { sb: 500,  bb: 1000, dur: 50 },
-    { sb: 750,  bb: 1500, dur: 50 },
-    { sb: 1000, bb: 2000, dur: 50 },
-  ];
-  const BLIND_THRESHOLDS = (() => {
-    let acc = 0; const arr = [];
-    for (const lv of BLIND_LEVELS) { acc += lv.dur; arr.push(acc); }
-    return arr; // 累積秒
-  })();
-
   function formatMMSS(sec) {
     sec = Math.max(0, Math.floor(sec));
     const m = Math.floor(sec / 60);
@@ -197,25 +178,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
     return `${m}:${String(s).padStart(2,'0')}`;
   }
 
-  function desiredBlindLevelIdx(nowMs) {
-    if (!state.blindStartMs) return 0;
-    const elapsed = (nowMs - state.blindStartMs) / 1000;
-    let idx = 0;
-    for (let i = 0; i < BLIND_THRESHOLDS.length; i++) {
-      if (elapsed >= BLIND_THRESHOLDS[i]) idx = i + 1; else break;
-    }
-    return Math.min(idx, BLIND_LEVELS.length - 1);
-  }
-
-  // 次のレベルまでの残り秒（スケジュール終端ならnull）
-  function timeToNextLevel(nowMs) {
-    if (!state.blindStartMs) return null;
-    const elapsed = (nowMs - state.blindStartMs) / 1000;
-    for (let i = 0; i < BLIND_THRESHOLDS.length; i++) {
-      if (elapsed < BLIND_THRESHOLDS[i]) return BLIND_THRESHOLDS[i] - elapsed;
-    }
-    return null;
-  }
+  // desiredBlindLevelIdx / timeToNextLevel は state.js を使用
 
   // ハンド開始時に必要ならブラインドを上げる（現在のハンドには影響しない）
   function maybeUpgradeBlindsAtNewHand() {
@@ -240,25 +203,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
 
   // セリフ（吹き出し）は ui/speech.js へ分離
 
-  // 指定した座席から、次のアクティブ（未フォールド・未オールイン・未離脱）プレイヤーIDを返す
-  function nextActiveFrom(startIdx) {
-    const n = players.length;
-    for (let i = 0; i < n; i++) {
-      const pid = (startIdx + i) % n;
-      if (!players[pid].folded && !players[pid].allIn && !players[pid].out) return pid;
-    }
-    return startIdx; // フォールバック（理論上到達しない）
-  }
-
-  // 指定した座席から、次の参加可能（未離脱）プレイヤーIDを返す
-  function nextNonOutFrom(startIdx) {
-    const n = players.length;
-    for (let i = 0; i < n; i++) {
-      const pid = (startIdx + i) % n;
-      if (!players[pid].out) return pid;
-    }
-    return startIdx;
-  }
+  // nextActiveFrom / nextNonOutFrom は state.js を使用
 
   function alivePlayersCount() {
     return players.filter(p => !p.out).length;
@@ -943,7 +888,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
     if (potsEl) {
       potsEl.innerHTML = '';
       if (state.street !== 'idle' && state.pot > 0) {
-        const pots = computePots();
+        const pots = computePots(players);
         pots.forEach((pot, idx) => {
           const div = document.createElement('div');
           const label = idx === 0 ? 'メイン' : `サイド${idx}`;
@@ -1363,7 +1308,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
     }
     renderAll();
     // サイドポットを計算して順に分配
-    const pots = computePots();
+    const pots = computePots(players);
     const scores = new Map();
     for (const p of players) {
       if (!p.folded && !p.out) scores.set(p.id, showdownInfo.get(p.id)?.score);
@@ -1473,21 +1418,7 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
   rsPot && rsPot.addEventListener('click', () => setRaiseTo(potBasedAmount(1)));
   rs2P && rs2P.addEventListener('click', () => setRaiseTo(potBasedAmount(2)));
 
-  // サイドポット計算
-  function computePots() {
-    const remaining = players.map(p => Math.max(0, p.total));
-    const pots = [];
-    while (true) {
-      const positive = remaining.map((v,i)=>({v,i})).filter(o=>o.v>0);
-      if (positive.length === 0) break;
-      const min = Math.min(...positive.map(o=>o.v));
-      const participants = positive.map(o=>o.i);
-      const amount = min * participants.length;
-      participants.forEach(i => remaining[i] -= min);
-      pots.push({ amount, eligible: participants, chunk: min });
-    }
-    return pots;
-  }
+  // サイドポット計算は engine/pots.js を使用
 
   // 役評価ロジックは core/scoring.js へ分離
 
