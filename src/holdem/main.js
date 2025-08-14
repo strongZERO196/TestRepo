@@ -4,7 +4,7 @@
 // - プリフロップ/フロップ/ターン/リバー + ショーダウン
 
 import { createDeck, rankLabel, removeCardFrom, cloneDeck } from './js/core/cards.js';
-import { bestScoreFrom, compareScore, best5Detailed, decisiveUsedCards, score5 } from './js/core/scoring.js';
+import { bestScoreFrom, compareScore, best5Detailed, decisiveUsedCards, score5, handName, scoreStrength01 } from './js/core/scoring.js';
 import { speak, setPlayersRef } from './js/ui/speech.js';
 import { loadCharactersFromJson as loadCharacters } from './js/data/characters.js';
 import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } from './js/ui/render.js';
@@ -1431,66 +1431,7 @@ import { betForced as betForcedEngine } from './js/engine/hand.js';
     }
   }
 
-  // best5Detailed / decisiveUsedCards は core/scoring.js を利用
-
-  function compareScore(a, b) {
-    for (let i=0;i<Math.max(a.length,b.length);i++){
-      const av=a[i]??0, bv=b[i]??0;
-      if (av!==bv) return av>bv?1:-1;
-    }
-    return 0;
-  }
-
-  // スコアを0..1の概略強さへマップ
-  function scoreStrength01(score, board, hand) {
-    if (!score) return 0;
-    const cat = score[0] || 0;
-    let base = cat / 8; // 0..1
-    // 役ごとの微調整
-    const rTop = (v)=> (v||0)/14;
-    if (cat === 4 || cat === 8) base += 0.08 * rTop(score[1]); // ストレート(フラッシュ)のトップ
-    else if (cat === 7) base += 0.04 * rTop(score[1]); // 4Kのランク
-    else if (cat === 6) base += 0.03 * rTop(score[1]); // フルハウス
-    else if (cat === 5) base += 0.05 * rTop(score[1]); // フラッシュのハイカード
-    else if (cat === 3 || cat === 2 || cat === 1) base += 0.03 * rTop(score[1]);
-
-    // ドロー補正（ざっくり）
-    const cards = [...(hand||[]), ...(board||[])];
-    const suits = new Map();
-    cards.forEach(c=>suits.set(c.s,(suits.get(c.s)||0)+1));
-    let maxSuit = 0; let favSuit=null; for (const [s,n] of suits){ if(n>maxSuit){ maxSuit=n; favSuit=s; } }
-    if (maxSuit === 4 && (hand||[]).some(c=>c.s===favSuit)) base += 0.12; // フラッシュドロー
-    // ストレートドロー簡易
-    const ranks = [...new Set(cards.map(c=>c.r))].sort((a,b)=>b-a);
-    for (let i=0;i<=ranks.length-4;i++){
-      const a=ranks[i],b=ranks[i+1],c=ranks[i+2],d=ranks[i+3];
-      if (a===b+1 && b===c+1 && (c===d+1 || c-1===d)) { base += 0.1; break; }
-    }
-    // オーバーカード（ハイカード時のみ少し）
-    if ((cat===0) && board && hand) {
-      const maxBoard = Math.max(0,...board.map(c=>c.r));
-      hand.forEach(h=>{ if (h.r>maxBoard) base += 0.02; });
-    }
-    return Math.max(0, Math.min(1, base));
-  }
-
-  // 役名（日本語）
-  function handName(score) {
-    if (!score) return '';
-    const cat = score[0];
-    const r = (v)=>rankLabel(v);
-    switch (cat) {
-      case 8: return `ストレートフラッシュ（${r(score[1])}ハイ）`;
-      case 7: return `フォーカード（${r(score[1])}）`;
-      case 6: return `フルハウス（${r(score[1])} フル ${r(score[2])}）`;
-      case 5: return `フラッシュ`;
-      case 4: return `ストレート（${r(score[1])}ハイ）`;
-      case 3: return `スリーカード（${r(score[1])}）`;
-      case 2: return `ツーペア（${r(score[1])} と ${r(score[2])}）`;
-      case 1: return `ワンペア（${r(score[1])}）`;
-      default: return `ハイカード（${r(score[1])}）`;
-    }
-  }
+  // best5Detailed / decisiveUsedCards / compareScore / handName / scoreStrength01 は core/scoring.js を利用
 
   // 簡易Botロジック
   function revealedForViewer(viewerId){
