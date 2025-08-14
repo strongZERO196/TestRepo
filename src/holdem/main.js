@@ -259,6 +259,44 @@
     p.lastAction = { type, amount, label };
   }
 
+  // セリフ（吹き出し）
+  const speechTimers = new Map(); // pid -> timeoutId
+  function seatElByPid(pid) { return document.querySelector('.seat-' + pid); }
+  function speak(pid, key) {
+    const p = players[pid];
+    const ls = (p && p.lines) || {};
+    const choose = (arr) => Array.isArray(arr) && arr.length ? arr[(Math.random() * arr.length) | 0] : null;
+    let text = null;
+    // abilityはキー別にも対応（ability_foresight等）
+    if (key.startsWith('ability_')) {
+      text = choose(ls[key]) || choose(ls.ability);
+    } else {
+      text = choose(ls[key]) || null;
+    }
+    if (!text) return;
+    showSpeech(pid, text);
+  }
+  function showSpeech(pid, text, duration = 2200) {
+    const seat = seatElByPid(pid);
+    if (!seat) return;
+    let bubble = seat.querySelector('.speech-bubble');
+    if (!bubble) {
+      bubble = document.createElement('div');
+      bubble.className = 'speech-bubble';
+      bubble.style.left = '50%';
+      bubble.style.top = '0px';
+      seat.appendChild(bubble);
+    }
+    bubble.textContent = text;
+    bubble.classList.remove('show'); // reflow でアニメ再実行
+    // eslint-disable-next-line no-unused-expressions
+    bubble.offsetWidth;
+    bubble.classList.add('show');
+    if (speechTimers.has(pid)) { clearTimeout(speechTimers.get(pid)); }
+    const tid = setTimeout(() => { if (bubble && bubble.parentNode) bubble.remove(); speechTimers.delete(pid); }, duration);
+    speechTimers.set(pid, tid);
+  }
+
   // 指定した座席から、次のアクティブ（未フォールド・未オールイン・未離脱）プレイヤーIDを返す
   function nextActiveFrom(startIdx) {
     const n = players.length;
@@ -337,6 +375,16 @@
       avatar: '../../assets/avatars/player-1.png',
       pose: '../../assets/avatars/souma-full.png',
       ability: { key: 'foresight', name: '未来視', desc: '次に公開されるボードカードを最大3枚まで透視（3回まで）', maxUses: 3 },
+      lines: {
+        check: ['様子を見る。','今は動かない。'],
+        call: ['受ける。','確かめよう。'],
+        raise: ['レイズ。','ここは押すべきだ。'],
+        allin: ['すべて賭ける。','読みは揺らがない。'],
+        fold: ['ここは引く。','分が悪い。'],
+        win: ['想定通り。','未来はこの形だった。'],
+        lose: ['次は修正する。','僅差だ。'],
+        ability: ['視える——次の一手。','未来視、起動。']
+      }
     },
     {
       key: 'yuri',
@@ -345,6 +393,16 @@
       avatar: '../../assets/avatars/player-0.png',
       pose: '../../assets/avatars/yuri-full.png',
       ability: { key: 'clairvoyance', name: '透視', desc: '各ラウンド1回まで／全員の手札から各1〜2枚を可視化（3回まで）', maxUses: 3 },
+      lines: {
+        check: ['ふん、まだ見せないでしょ。','様子見ってわけ。'],
+        call: ['受けてあげる。','そこ、乗るわ。'],
+        raise: ['もっと上げるわよ。','ビビってんの？ レイズ。'],
+        allin: ['全部ぶつける！','ここが勝負所よ！'],
+        fold: ['今回は退いてあげる。','ツイてないわね。'],
+        win: ['ほら、暴いて勝つ。','読めてたって言ったでしょ。'],
+        lose: ['次は隠せないからね。','ちょっとズレたわね。'],
+        ability: ['見せてもらうわよ——全部ね。','透視、発動。隠し事は無し。']
+      }
     },
     {
       key: 'yusei',
@@ -353,6 +411,16 @@
       avatar: '../../assets/avatars/player-2.png',
       pose: '../../assets/avatars/yusei-full.png',
       ability: { key: 'teleport', name: '瞬間移動', desc: '自分の手札1枚をすり替える（3回まで）', maxUses: 3 },
+      lines: {
+        check: ['……今は静かに。','焦らない。'],
+        call: ['行く。','受けるだけ。'],
+        raise: ['上げる。','ここで圧を。'],
+        allin: ['全額。','ここで決める。'],
+        fold: ['撤退。','引く。'],
+        win: ['……勝った。','運じゃない。'],
+        lose: ['次だ。','動きが足りなかった。'],
+        ability: ['位置、変える。','一枚だけ——置き換える。']
+      }
     },
     {
       key: 'satsuki',
@@ -361,6 +429,16 @@
       avatar: '../../assets/avatars/player-3.png',
       pose: '../../assets/avatars/satsuki-full.png',
       ability: { key: 'blessing', name: '幸運の加護', desc: '発動後、次のターンで役が揃いやすくなる（3回まで）', maxUses: 3 },
+      lines: {
+        check: ['慌てずに……ね。','様子を見ましょう。'],
+        call: ['受けます。','うん、行けると思う。'],
+        raise: ['少しだけ上げますね。','ここは押してみます。'],
+        allin: ['えいっ……全部！','運も味方してる、はず。'],
+        fold: ['ここはガマン、ですね。','無理はしないの。'],
+        win: ['よかった……！','うん、繋がった。'],
+        lose: ['次こそは……！','まだ、諦めないよ。'],
+        ability: ['どうか、いい巡り合わせを——','加護を、少しだけ。']
+      }
     },
   ];
   async function loadCharactersFromJson() {
@@ -383,6 +461,7 @@
             gender: data.gender || 'unknown',
             avatar: data.avatar || '',
             pose: data.pose || data.avatar || '',
+            lines: data.lines || {},
             ability: {
               key: data.ability.key || '',
               name: data.ability.name || '',
@@ -481,6 +560,7 @@
         players[0].avatar = chosen.avatar;
         players[0].pose = chosen.pose || chosen.avatar;
         players[0].ability = chosen.ability ? { ...chosen.ability, uses: chosen.ability.maxUses } : null;
+        players[0].lines = chosen.lines || {};
         // 残りをBotへ割当（先頭3つ）
         const rest = CHARACTERS.filter(c => c.key !== key);
         [1,2,3].forEach((pid, idx) => {
@@ -488,6 +568,7 @@
           players[pid].avatar = rest[idx].avatar;
           players[pid].pose = rest[idx].pose || rest[idx].avatar;
           players[pid].ability = rest[idx].ability ? { ...rest[idx].ability, uses: rest[idx].ability.maxUses } : null;
+          players[pid].lines = rest[idx].lines || {};
         });
         state.charSelected = true;
         loadAvatars();
@@ -561,12 +642,14 @@
       players[0].avatar = chosen.avatar;
       players[0].pose = chosen.pose || chosen.avatar;
       players[0].ability = chosen.ability ? { ...chosen.ability, uses: chosen.ability.maxUses } : null;
+      players[0].lines = chosen.lines || {};
       const rest = CHARACTERS.filter(c => c.key !== key);
       [1,2,3].forEach((pid, idx) => {
         players[pid].name = rest[idx].name;
         players[pid].avatar = rest[idx].avatar;
         players[pid].pose = rest[idx].pose || rest[idx].avatar;
         players[pid].ability = rest[idx].ability ? { ...rest[idx].ability, uses: rest[idx].ability.maxUses } : null;
+        players[pid].lines = rest[idx].lines || {};
       });
       state.charSelected = true;
       loadAvatars();
@@ -699,6 +782,7 @@
       }
       // カットイン（透視）
       showCutIn('clairvoyance', me.name, me.ability?.name || '透視', me.avatar, me.pose);
+      speak(me.id, 'ability_clairvoyance');
       const abilityRow = document.querySelector('.controls .row.row-ability');
       if (abilityRow) {
         abilityRow.classList.remove('flash');
@@ -836,6 +920,7 @@
       me.ability.uses -= 1;
       // カットイン（テレポート）
       showCutIn('teleport', me.name, me.ability.name, me.avatar, me.pose);
+      speak(me.id, 'ability_teleport');
       renderAll();
       finish();
     };
@@ -873,6 +958,7 @@
       }
       // カットイン（未来視）
       showCutIn('foresight', me.name, me.ability.name, me.avatar, me.pose);
+      speak(me.id, 'ability_foresight');
       // 能力行のハイライト
       const abilityRow = document.querySelector('.controls .row.row-ability');
       if (abilityRow) {
@@ -965,6 +1051,7 @@
       // 残滓は goNextStreet で自動設定（1ストリート分の弱効果）
       log('幸運の加護: 次のカードが味方する…');
       showCutIn('blessing', me.name, me.ability.name, me.avatar, me.pose);
+      speak(me.id, 'ability_blessing');
       // 能力行のハイライト
       const abilityRow = document.querySelector('.controls .row.row-ability');
       if (abilityRow) {
@@ -1401,15 +1488,17 @@
     if (action === 'fold') {
       p.folded = true; state.acted.delete(pid); log(`${p.name}: フォールド`);
       setLastAction(p, 'fold');
+      speak(pid, 'fold');
     } else if (action === 'check') {
       if (p.bet !== state.currentBet) return;
       log(`${p.name}: チェック`);
       state.acted.add(pid);
       setLastAction(p, 'check');
+      speak(pid, 'check');
       updateOpenCardsFlag();
     } else if (action === 'call') {
       const need = state.currentBet - p.bet;
-      if (need <= 0) { /* チェック相当 */ log(`${p.name}: チェック`); state.acted.add(pid); setLastAction(p, 'check'); }
+      if (need <= 0) { /* チェック相当 */ log(`${p.name}: チェック`); state.acted.add(pid); setLastAction(p, 'check'); speak(pid,'check'); }
       else if (p.chips <= 0) { /* 何もしない */ }
       else if (p.chips < need) { // オールイン・コール（部分）
         const pay = p.chips;
@@ -1417,11 +1506,13 @@
         log(`${p.name}: オールイン（${pay}）`);
         state.acted.add(pid);
         setLastAction(p, 'allin', pay);
+        speak(pid, 'allin');
       } else {
         p.chips -= need; p.bet += need; p.total += need; state.pot += need;
         log(`${p.name}: コール ${need}`);
         state.acted.add(pid);
         setLastAction(p, 'call', need);
+        speak(pid, 'call');
       }
       updateOpenCardsFlag();
     } else if (action === 'raise') {
@@ -1447,6 +1538,7 @@
         state.acted = new Set([pid]);
         log(`${p.name}: レイズ ${need}（合計ベット ${amount}）`);
         setLastAction(p, 'raise', need);
+        speak(pid, 'raise');
       }
       updateOpenCardsFlag();
     } else if (action === 'allin') {
@@ -1457,6 +1549,7 @@
       p.chips = 0; p.allIn = true; p.bet += pay; p.total += pay; state.pot += pay;
       log(`${p.name}: オールイン（${pay}）`);
       setLastAction(p, 'allin', pay);
+      speak(pid, 'allin');
       const newTotal = p.bet;
       if (newTotal > prevBetLevel) {
         const raiseSize = newTotal - prevBetLevel;
@@ -1553,6 +1646,14 @@
       if (remainder > 0) players[winners[0]].chips += remainder; // 余りは先頭へ（簡略）
       log(`${potName}: 勝者 ${winners.map(id=>players[id].name).join(', ')} / ${pot.amount}`);
     });
+    // セリフ（勝ち/負け）
+    try {
+      for (const p of players) {
+        if (p.out) continue;
+        if (winnersSet.has(p.id)) speak(p.id, 'win');
+        else if (!p.folded) speak(p.id, 'lose');
+      }
+    } catch(_) {}
     state.pot = 0;
     // チップが尽きたプレイヤーは離脱（ユーザーならゲームオーバー表示）
     for (const p of players) {
@@ -1971,6 +2072,7 @@
         const overlay = document.getElementById('ability-overlay');
         if (overlay) { overlay.classList.add('show'); setTimeout(()=>overlay.classList.remove('show'), 820); }
         showCutIn('foresight', p.name, p.ability.name, p.avatar, p.pose);
+        speak(p.id, 'ability_foresight');
         p.aggrPulse = (p.aggrPulse||0) + 2;
         return true;
       }
@@ -1994,6 +2096,7 @@
         const overlay2 = document.getElementById('clairvoyance-overlay');
         if (overlay2) { overlay2.classList.add('show'); setTimeout(()=>overlay2.classList.remove('show'), 860); }
         showCutIn('clairvoyance', p.name, p.ability.name, p.avatar, p.pose);
+        speak(p.id, 'ability_clairvoyance');
         p.aggrPulse = (p.aggrPulse||0) + 1;
         return true;
       }
@@ -2041,6 +2144,7 @@
         p.ability.uses -= 1;
         log(`${p.name}: 能力を発動（瞬間移動）`);
         showCutIn('teleport', p.name, p.ability.name, p.avatar, p.pose);
+        speak(p.id, 'ability_teleport');
         p.justTeleported = true;
         return true;
       }
@@ -2050,6 +2154,7 @@
         state.blessingStrongFor = p.id;
         log(`${p.name}: 能力を発動（幸運の加護）`);
         showCutIn('blessing', p.name, p.ability.name, p.avatar, p.pose);
+        speak(p.id, 'ability_blessing');
         p.aggrPulse = (p.aggrPulse||0) + 2;
         return true;
       }
