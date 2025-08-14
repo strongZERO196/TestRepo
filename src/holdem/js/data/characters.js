@@ -22,6 +22,9 @@ export async function loadCharactersFromJson() {
           avatar: data.avatar || '',
           pose: data.pose || data.avatar || '',
           lines: data.lines || {},
+          rules: data.rules || null,
+          story: data.story || null,
+          background: data.background || '',
           ability: {
             key: data.ability.key || '',
             name: data.ability.name || '',

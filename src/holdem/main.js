@@ -282,11 +282,17 @@ import { playerAction as enginePlayerAction } from './js/engine/actions.js';
           if (body) {
             body.innerHTML = '';
             // ストーリー
-            if (data && Array.isArray(data.paras)) {
+            if (data && Array.isArray(data.paras) && data.paras.length) {
               const storySec = document.createElement('div');
               storySec.className = 'story-section';
               const h3 = document.createElement('h3'); h3.textContent = 'ストーリー'; storySec.appendChild(h3);
               data.paras.forEach(t => { const p = document.createElement('p'); p.textContent = t; storySec.appendChild(p); });
+              body.appendChild(storySec);
+            } else if (char && typeof char.background === 'string' && char.background.trim()) {
+              const storySec = document.createElement('div');
+              storySec.className = 'story-section';
+              const h3 = document.createElement('h3'); h3.textContent = 'ストーリー'; storySec.appendChild(h3);
+              const p = document.createElement('p'); p.textContent = char.background; storySec.appendChild(p);
               body.appendChild(storySec);
             }
             // 能力詳細
@@ -294,19 +300,15 @@ import { playerAction as enginePlayerAction } from './js/engine/actions.js';
             abilitySec.className = 'story-section';
             const h3b = document.createElement('h3'); h3b.textContent = '能力の詳細'; abilitySec.appendChild(h3b);
             const ab = char && char.ability;
-            const notesByKey = {
-              foresight: ['ボード未完成時のみ使用可', '次に公開されるカードを最大3枚まで確認', '可視化は使用者のみ（相手には非公開）'],
-              clairvoyance: ['相手全員の手札から各1枚を可視化', '1人につき1枚のみ（同ハンド中保持）', '可視化は使用者のみ有利な情報'],
-              teleport: ['自分の手札1枚のみすり替え可能', 'リバーのボードは対象外', '山札から有利になりやすいカードを選定'],
-              blessing: ['このハンド中持続（同一ハンドで連続発動不可）', '次の配布カードが有利になりやすい']
-            };
             if (ab) {
               const p1 = document.createElement('p'); p1.innerHTML = `<strong>能力:</strong> ${ab.name}`; abilitySec.appendChild(p1);
               const p2 = document.createElement('p'); p2.innerHTML = `<strong>効果:</strong> ${ab.desc}`; abilitySec.appendChild(p2);
               const p3 = document.createElement('p'); p3.innerHTML = `<strong>使用回数:</strong> ${ab.maxUses} 回`; abilitySec.appendChild(p3);
-              const extra = notesByKey[ab.key] || [];
-              if (extra.length) {
-                extra.forEach(t => { const p = document.createElement('p'); p.textContent = `・${t}`; abilitySec.appendChild(p); });
+              const notes = (char && char.rules && char.rules.notes);
+              if (Array.isArray(notes)) {
+                notes.forEach(t => { const p = document.createElement('p'); p.textContent = `・${t}`; abilitySec.appendChild(p); });
+              } else if (typeof notes === 'string' && notes.trim()) {
+                const p = document.createElement('p'); p.textContent = `・${notes}`; abilitySec.appendChild(p);
               }
             } else {
               const p0 = document.createElement('p'); p0.textContent = '能力情報を読み込み中、または見つかりませんでした。'; abilitySec.appendChild(p0);
