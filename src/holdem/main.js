@@ -7,6 +7,7 @@ import { createDeck, rankLabel, removeCardFrom, cloneDeck } from './js/core/card
 import { bestScoreFrom, compareScore, best5Detailed, decisiveUsedCards, score5 } from './js/core/scoring.js';
 import { speak, setPlayersRef } from './js/ui/speech.js';
 import { loadCharactersFromJson as loadCharacters } from './js/data/characters.js';
+import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } from './js/ui/render.js';
 
 (() => {
   'use strict';
@@ -264,47 +265,10 @@ import { loadCharactersFromJson as loadCharacters } from './js/data/characters.j
   }
 
   // ログ
-  function log(msg) {
-    // 既存ログパネル（最新を上に表示）
-    // 旧仕様のテキスト追記から行要素管理に切り替え
-    const prevLatest = logEl.querySelector('.log-line.latest');
-    if (prevLatest) prevLatest.classList.remove('latest');
-
-    const line = document.createElement('div');
-    line.className = 'log-line latest';
-    line.textContent = msg;
-    logEl.insertBefore(line, logEl.firstChild);
-
-    // 先頭行が最新のためスクロール位置は上
-    logEl.scrollTop = 0;
-    // biim風オーバーレイ
-    const overlay = document.getElementById('overlay');
-    if (overlay) {
-      const line = document.createElement('div');
-      line.className = 'overlay-line';
-      line.textContent = msg;
-      overlay.appendChild(line);
-      // 上限行数を維持
-      while (overlay.children.length > 8) overlay.firstChild.remove();
-      line.addEventListener('animationend', () => {
-        line.remove();
-      });
-    }
-  }
+  function log(msg) { return uiLog(msg); }
 
   // アバター読み込み（assets/avatars/player-{id}.png を自動適用）
-  function loadAvatars() {
-    for (const p of players) {
-      const el = document.getElementById('avatar-' + p.id);
-      if (!el) continue;
-      const src = p.avatar;
-      if (src) {
-        el.style.backgroundImage = `url('${src}')`;
-        el.style.backgroundSize = 'cover';
-        el.style.backgroundPosition = 'center';
-      }
-    }
-  }
+  function loadAvatars() { return uiLoadAvatars(players); }
 
   // キャラクター定義（JSONから読み込み）は data/characters.js へ分離
   let CHARACTERS = [];
@@ -510,38 +474,7 @@ import { loadCharactersFromJson as loadCharacters } from './js/data/characters.j
   }
 
   // カットイン表示
-  function showCutIn(type, name, abilityName, avatarUrl, poseUrl) {
-    if (!cutinEl) return;
-    cutinEl.classList.remove('is-foresight','is-vision','show');
-    if (type === 'foresight') cutinEl.classList.add('is-foresight');
-    else if (type === 'clairvoyance') cutinEl.classList.add('is-vision');
-    else if (type === 'teleport') cutinEl.classList.add('is-teleport');
-    if (cutinPortrait && avatarUrl) {
-      cutinPortrait.style.backgroundImage = `url('${avatarUrl}')`;
-    }
-    if (cutinPose) {
-      const src = poseUrl || avatarUrl || '';
-      cutinPose.style.backgroundImage = src ? `url('${src}')` : '';
-    }
-    if (cutinName) cutinName.textContent = name || '';
-    if (cutinAbility) cutinAbility.textContent = abilityName || '';
-    // 再生
-    // reflow to restart
-    // eslint-disable-next-line no-unused-expressions
-    cutinEl.offsetWidth;
-    cutinEl.style.display = 'block';
-    cutinEl.setAttribute('aria-hidden','false');
-    cutinEl.classList.add('show');
-    const endFn = () => {
-      cutinEl.classList.remove('show');
-      cutinEl.style.display = 'none';
-      cutinEl.setAttribute('aria-hidden','true');
-      cutinEl.removeEventListener('animationend', endFn);
-    };
-    // 念のため両方で終了処理
-    cutinEl.addEventListener('animationend', endFn);
-    setTimeout(endFn, 1700);
-  }
+  function showCutIn(type, name, abilityName, avatarUrl, poseUrl) { return uiShowCutIn(type, name, abilityName, avatarUrl, poseUrl); }
 
   // 透視対象の選択管理
   state.abilityTargeting = false; // 対象選択モード
