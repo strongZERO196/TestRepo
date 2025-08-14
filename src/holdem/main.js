@@ -3,6 +3,9 @@
 // - ノーリミット風だが簡略化（サイドポットなし／オールイン回避のため所持未満はフォールド）
 // - プリフロップ/フロップ/ターン/リバー + ショーダウン
 
+import { createDeck, rankLabel, removeCardFrom, cloneDeck } from './js/core/cards.js';
+import { bestScoreFrom, compareScore, best5Detailed, decisiveUsedCards, score5 } from './js/core/scoring.js';
+
 (() => {
   'use strict';
 
@@ -44,36 +47,7 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // カード表現
-  const SUITS = ['♠','♥','♦','♣'];
-  const RANKS = [2,3,4,5,6,7,8,9,10,11,12,13,14]; // 11:J 12:Q 13:K 14:A
-  function createDeck() {
-    const deck = [];
-    for (const s of SUITS) {
-      for (const r of RANKS) deck.push({ r, s });
-    }
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
-  }
-  function rankLabel(r) {
-    if (r <= 10) return String(r);
-    return {11:'J',12:'Q',13:'K',14:'A'}[r];
-  }
-
-  function sameCard(a, b) { return a && b && a.r === b.r && a.s === b.s; }
-  function removeCardFrom(arr, card) {
-    const idx = arr.findIndex(c => sameCard(c, card));
-    if (idx >= 0) arr.splice(idx, 1);
-  }
-  function cloneDeck() {
-    // 新規デッキ（値オブジェクト）
-    const d = [];
-    for (const s of SUITS) for (const r of RANKS) d.push({r,s});
-    return d;
-  }
+  // カード表現（cards.jsへ分離済み）
 
   // Monte Carlo による勝率（ユーザー vs アクティブ他家）
   function estimateEquity(trials = 1200) {
@@ -1737,89 +1711,7 @@
     return pots;
   }
 
-  // スコアリング（5枚）
-  // 返却: [cat, ...kickers] 大きい方が強い。cat: 8=SF 7=4K 6=FH 5=F 4=S 3=3K 2=2P 1=1P 0=HC
-  function score5(cards) {
-    const ranks = cards.map(c => c.r).sort((a,b)=>b-a);
-    const suits = cards.map(c => c.s);
-    const counts = new Map();
-    for (const r of ranks) counts.set(r, (counts.get(r)||0)+1);
-    const byCount = [...counts.entries()].sort((a,b)=> b[1]-a[1] || b[0]-a[0]);
-    const isFlush = suits.every(s => s === suits[0]);
-    const uniq = [...new Set(ranks)];
-    // ストレート（A-5対応）
-    let isStraight = false, topStraight = 0;
-    const seq = [...ranks];
-    // 重複除去して高→低で確認
-    const rset = uniq;
-    for (let i = 0; i <= rset.length - 5; i++) {
-      const a=rset[i], b=rset[i+1], c=rset[i+2], d=rset[i+3], e=rset[i+4];
-      if (a===b+1 && b===c+1 && c===d+1 && d===e+1) { isStraight=true; topStraight=a; break; }
-    }
-    // A-5（A=14, 5=5）
-    if (!isStraight && rset.includes(14) && rset.includes(5) && rset.includes(4) && rset.includes(3) && rset.includes(2)) {
-      isStraight = true; topStraight = 5;
-    }
-    if (isStraight && isFlush) return [8, topStraight]; // ストフラ
-    if (byCount[0][1] === 4) return [7, byCount[0][0], byCount.find(e=>e[1]===1)[0]]; // 4K
-    if (byCount[0][1] === 3 && byCount[1][1] === 2) return [6, byCount[0][0], byCount[1][0]]; // フルハウス
-    if (isFlush) return [5, ...ranks];
-    if (isStraight) return [4, topStraight];
-    if (byCount[0][1] === 3) {
-      const kick = ranks.filter(r=>r!==byCount[0][0]);
-      return [3, byCount[0][0], ...kick];
-    }
-    if (byCount[0][1] === 2 && byCount[1]?.[1] === 2) {
-      const high = Math.max(byCount[0][0], byCount[1][0]);
-      const low = Math.min(byCount[0][0], byCount[1][0]);
-      const kick = ranks.filter(r=>r!==high && r!==low)[0];
-      return [2, high, low, kick];
-    }
-    if (byCount[0][1] === 2) {
-      const pair = byCount[0][0];
-      const kick = ranks.filter(r=>r!==pair);
-      return [1, pair, ...kick];
-    }
-    return [0, ...ranks];
-  }
-
-  function best5Score(cards7) {
-    // 7枚から5枚を全探索（21通り）
-    let best = null;
-    for (let i=0;i<cards7.length;i++){
-      for (let j=i+1;j<cards7.length;j++){
-        const five = cards7.filter((_,idx)=>idx!==i && idx!==j);
-        const s = score5(five);
-        if (!best || compareScore(s, best) > 0) best = s;
-      }
-    }
-    return best;
-  }
-
-  // 可変枚数（5〜7枚）に対応したベスト評価
-  function bestScoreFrom(cards) {
-    const n = cards.length;
-    if (n < 5) return [0];
-    if (n === 5) return score5(cards);
-    let best = null;
-    if (n === 6) {
-      for (let i=0;i<6;i++) {
-        const five = cards.filter((_,idx)=>idx!==i);
-        const s = score5(five);
-        if (!best || compareScore(s, best) > 0) best = s;
-      }
-      return best;
-    }
-    // n>=7 は7想定で2枚除去
-    for (let i=0;i<n;i++){
-      for (let j=i+1;j<n;j++){
-        const five = cards.filter((_,idx)=>idx!==i && idx!==j);
-        const s = score5(five);
-        if (!best || compareScore(s, best) > 0) best = s;
-      }
-    }
-    return best;
-  }
+  // 役評価ロジックは core/scoring.js へ分離
 
   // 幸運の加護: 次に配るカードk枚を、有利になるようデッキ末尾付近から強く選ぶ
   function applyBlessingBeforeDeal(forPid, k) {
@@ -1901,63 +1793,7 @@
     }
   }
 
-  function best5Detailed(cards7) {
-    let best = null;
-    let bestCards = null;
-    for (let i=0;i<cards7.length;i++){
-      for (let j=i+1;j<cards7.length;j++){
-        const five = cards7.filter((_,idx)=>idx!==i && idx!==j);
-        const s = score5(five);
-        if (!best || compareScore(s, best) > 0) { best = s; bestCards = five; }
-      }
-    }
-    return { score: best, used: bestCards };
-  }
-
-  // 勝因となるカードのみ抽出（キッカーは除外）
-  function decisiveUsedCards(used, score) {
-    if (!used || !score) return [];
-    const cat = score[0];
-    const byRank = new Map(); // rank -> cards[]
-    for (const c of used) {
-      const arr = byRank.get(c.r) || [];
-      arr.push(c);
-      byRank.set(c.r, arr);
-    }
-    const all = [...used];
-    switch (cat) {
-      case 8: // ストレートフラッシュ
-        return all;
-      case 7: { // フォーカード
-        for (const arr of byRank.values()) if (arr.length === 4) return arr;
-        return all;
-      }
-      case 6: // フルハウス（5枚全部が役構成）
-        return all;
-      case 5: // フラッシュ
-        return all;
-      case 4: // ストレート
-        return all;
-      case 3: { // スリーカード
-        for (const arr of byRank.values()) if (arr.length === 3) return arr;
-        return all;
-      }
-      case 2: { // ツーペア
-        const res = [];
-        for (const arr of byRank.values()) if (arr.length === 2) res.push(...arr);
-        return res.length ? res : all;
-      }
-      case 1: { // ワンペア
-        for (const arr of byRank.values()) if (arr.length === 2) return arr;
-        return all;
-      }
-      default: { // ハイカード（最大ランクのみ）
-        let max = used[0];
-        for (const c of used) if (c.r > max.r) max = c;
-        return [max];
-      }
-    }
-  }
+  // best5Detailed / decisiveUsedCards は core/scoring.js を利用
 
   function compareScore(a, b) {
     for (let i=0;i<Math.max(a.length,b.length);i++){
