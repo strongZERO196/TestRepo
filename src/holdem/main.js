@@ -224,55 +224,7 @@ import { playerAction as enginePlayerAction } from './js/engine/actions.js';
   let CHARACTERS = [];
   let charactersLoadedPromise = null;
 
-  // キャラクター個別ストーリー
-  const CHAR_STORIES = {
-    souma: {
-      title: '朝霧 湊真 — 冷静沈着・無表情／未来視',
-      paras: [
-        '湊真は、感情を表に出すことがほとんどない。クラスで笑いが起きても、沈黙が流れても、その表情は水面のように静かだ。',
-        'しかし放課後の部室でカードを手にするときだけ、瞳がわずかに揺れる。そこには、ほんの数秒先の情景が映る',
-        '——まだ配られていないカード、相手が出す手、わずかな仕草。',
-        '顧問が失踪したあの日、湊真は未来の断片を見た。机から滑り落ちるジョーカー、その先に広がるポーカーテーブル。',
-        '未来は変えられるのか、それとも定められているのか。',
-        '答えを確かめるために、湊真は静かに席を立つ。',
-        '——こうして彼は、学園の代表として勝負の場に向かう決意をした。'
-      ]
-    },
-    yusei: {
-      title: '霧坂 悠聖 — おとなしい／瞬間移動',
-      paras: [
-        '悠聖は、常に物静かで、気配すら薄い。「あれ、さっきまでいなかったよな？」と驚かれることも珍しくない。',
-        '彼の力は瞬間移動。幼い頃は遊び半分で使っていたが、人を助けるために使うようになったのは最近のことだった。',
-        '顧問が消えた日、悠聖はふと職員室を通りかかった。',
-        '机の上に置かれたトランプと招待状——次の瞬間、それは自分の手の中にあった。無意識に“飛んで”しまったのだ。',
-        '偶然か、それとも導かれたのか。',
-        '悠聖は静かに息を整えると、仲間の視線を受け止めた。',
-        '——こうして彼は、学園の代表としてカードを握ることを選んだ。'
-      ]
-    },
-    yuri: {
-      title: '桜庭 柚凛 — 強気・挑発的／透視',
-      paras: [
-        '柚凛は負けず嫌いで、口喧嘩なら相手が誰であろうと退かない。挑発も容赦ないが、それは彼女の自信の表れでもある。',
-        '片目に浮かぶ赤いスコープは、相手の隠し事を暴く透視の力。小さな秘密も、彼女の視線からは逃れられない。',
-        '顧問が姿を消した翌日、柚凛は部室のロッカーに隠されていた写真を見つけた。そこには、見知らぬ街のポーカーテーブルで笑う顧問の姿があった。',
-        '「アンタの隠してることも、先生の居場所も、全部暴いてやる」',
-        '赤い視界に燃えるような光が宿る。',
-        '——こうして彼女は、学園の代表として勝負の席に着くことを決めた。'
-      ]
-    },
-    satsuki: {
-      title: '水瀬 紗月 — おしとやか・運命の引き／幸運の加護',
-      paras: [
-        '紗月は柔らかな物腰の少女だが、その周囲では不思議と良い偶然が重なる。失くした物がすぐ見つかる、',
-        '偶然の出会いが助けになる——まるで運命が味方しているかのように。',
-        'それは彼女の“幸運の加護”と呼ばれる力。意識せずとも、引くべきカードを引き寄せてしまう。',
-        '顧問が失踪した夜、紗月は夢を見た。暗い会場で配られるカード、勝利を告げる役、その後ろに立つ顧問の姿。',
-        'それがただの夢か、それとも未来の兆しか——紗月は迷わなかった。',
-        '——こうして彼女は、学園の代表としてその幸運を賭ける道を選んだ。'
-      ]
-    }
-  };
+  // キャラクター個別ストーリーは avatars JSON 側の story を参照
 
   function setupCharacterSelection() {
     const layer = document.getElementById('char-select');
@@ -317,12 +269,12 @@ import { playerAction as enginePlayerAction } from './js/engine/actions.js';
       const storyBtn = e.target.closest('.btn-char-story');
       if (storyBtn && layer.contains(storyBtn)) {
         const key = storyBtn.getAttribute('data-char');
-        const data = CHAR_STORIES[key];
         if (!CHARACTERS.length) {
           try { await (charactersLoadedPromise || (charactersLoadedPromise = loadCharacters().then(res=>{ CHARACTERS = res; return res; }))); } catch(_) {}
         }
         const modal = document.getElementById('story-modal');
         const char = CHARACTERS.find(c => c.key === key);
+        const data = char && char.story;
         if (modal) {
           const h2 = modal.querySelector('h2');
           const body = modal.querySelector('.story-body');
