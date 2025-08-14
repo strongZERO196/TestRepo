@@ -13,6 +13,7 @@ import { computePots } from './js/engine/pots.js';
 import * as flow from './js/engine/flow.js';
 import * as turn from './js/engine/turn.js';
 import { betForced as betForcedEngine } from './js/engine/hand.js';
+import * as handflow from './js/engine/handflow.js';
 
 (() => {
   'use strict';
@@ -1023,52 +1024,12 @@ import { betForced as betForcedEngine } from './js/engine/hand.js';
 
     state.openCards = false;
     maybeUpgradeBlindsAtNewHand();
-    state.deck = createDeck();
-    state.board = [];
-    state.pot = 0;
-    state.street = 'preflop';
-    state.currentBet = 0;
-    state.minRaise = state.bb;
-    state.lastAggressor = null;
-    state.acted = new Set();
-    state.blessingStrongFor = null;
-    state.blessingResidualPid = null;
-    state.blessingResidualCount = 0;
-    state.usedClairvoyanceStreet = new Set();
-    if (peekEl) peekEl.innerHTML = '';
-    for (const p of players) {
-      if (!p.out) {
-        p.hand = []; p.folded = false; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealMask = 0;
-      } else {
-        p.hand = []; p.folded = true; p.bet = 0; p.total = 0; p.allIn = false; p.lastAction = null; p.revealMask = 0;
-      }
-    }
-    // ボタン移動
-    state.dealer = nextNonOutFrom((state.dealer + 1) % players.length);
-    // ブラインド
-    const sbPos = nextNonOutFrom((state.dealer + 1) % players.length);
-    const bbPos = nextNonOutFrom((sbPos + 1) % players.length);
-    betForced(sbPos, state.sb, 'SB');
-    betForced(bbPos, state.bb, 'BB');
-    state.currentBet = state.bb;
-    state.acted = new Set(); // プリフロップ開始時点で全員未アクション
-    // 配札
-    for (let i = 0; i < 2; i++) {
-      for (let p = 0; p < players.length; p++) {
-        const pid = (state.dealer + 1 + p) % players.length;
-        if (!players[pid].out) players[pid].hand.push(state.deck.pop());
-      }
-    }
-    // アクション開始はBBの次（フォールド席はスキップ）
-    state.toAct = nextActiveFrom((bbPos + 1) % players.length);
-    // レイズ入力のデフォルトをリセット（前ハンド値の持ち越しを防ぐ）
-    if (raiseAmt) {
-      const minTotal = state.currentBet + state.minRaise;
-      raiseAmt.value = String(minTotal);
-    }
-    log(`--- 新しいハンド Dealer: ${players[state.dealer].name} ---`);
-    renderAll();
-    turnLoopIfBot();
+    // handflowへ委譲
+    return handflow.newHand({
+      players, state, createDeck, log, renderAll,
+      betForced, nextNonOutFrom, nextActiveFrom,
+      raiseAmtEl: raiseAmt, turnLoopIfBot, peekEl,
+    });
   }
 
   function betForced(pid, amt, label) { return betForcedEngine(players, state, pid, amt, label, log, setLastAction); }
@@ -1123,54 +1084,9 @@ import { betForced as betForcedEngine } from './js/engine/hand.js';
   }
 
   function goNextStreet() {
-    // ベットをリセット
-    for (const p of players) p.bet = 0;
-    state.currentBet = 0;
-    state.minRaise = state.bb;
-    state.lastAggressor = null;
-    state.acted = new Set();
-    // 直近アクションは次ストリートでクリア
-    for (const p of players) { if (!p.folded && !p.out) p.lastAction = null; }
-    // ストリートが進んだら 透視の同一ラウンド制限を解除
-    state.usedClairvoyanceStreet = new Set();
-
-    if (players.filter(p => !p.folded && !p.out).length <= 1) {
-      showdown();
-      return;
-    }
-
-    if (state.street === 'preflop') {
-      // 幸運の加護（強→残滓）
-      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 3); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
-      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 3); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
-      // フロップ 3枚
-      state.board.push(state.deck.pop(), state.deck.pop(), state.deck.pop());
-      state.street = 'flop';
-    } else if (state.street === 'flop') {
-      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 1); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
-      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 1); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
-      state.board.push(state.deck.pop());
-      state.street = 'turn';
-    } else if (state.street === 'turn') {
-      if (state.blessingStrongFor!=null) { applyBlessingBeforeDeal(state.blessingStrongFor, 1); state.blessingStrongFor=null; state.blessingResidualPid = players[0]?.id ?? 0; state.blessingResidualCount = 1; }
-      else if (state.blessingResidualPid!=null && state.blessingResidualCount>0) { applyBlessingBeforeDeal({pid:state.blessingResidualPid, weak:true}, 1); state.blessingResidualCount--; if (state.blessingResidualCount<=0) { state.blessingResidualPid=null; } }
-      state.board.push(state.deck.pop());
-      state.street = 'river';
-    } else if (state.street === 'river') {
-      showdown();
-      return;
-    }
-    // 幸運の加護はこのハンド中ずっと有効（解除しない）
-    // 次はSBの次（フロップ以降）
-    const sbPos = nextNonOutFrom((state.dealer + 1) % players.length);
-    state.toAct = nextActiveFrom((sbPos + 1) % players.length);
-    renderAll();
-    if (!players.some(p => !p.folded && !p.allIn)) {
-      // 全員オールインなら自動で次ストリートへ
-      setTimeout(goNextStreet, 600);
-    } else {
-      turnLoopIfBot();
-    }
+    return handflow.goNextStreet({
+      players, state, renderAll, nextNonOutFrom, nextActiveFrom, applyBlessingBeforeDeal, turnLoopIfBot, showdown,
+    });
   }
 
   function playerAction(pid, action, amount = 0) {
