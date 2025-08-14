@@ -11,6 +11,8 @@ import { log as uiLog, showCutIn as uiShowCutIn, loadAvatars as uiLoadAvatars } 
 import { players, state, BLIND_LEVELS, BLIND_THRESHOLDS, desiredBlindLevelIdx, timeToNextLevel, nextActiveFrom, nextNonOutFrom } from './js/core/state.js';
 import { computePots } from './js/engine/pots.js';
 import * as flow from './js/engine/flow.js';
+import * as turn from './js/engine/turn.js';
+import { betForced as betForcedEngine } from './js/engine/hand.js';
 
 (() => {
   'use strict';
@@ -1069,16 +1071,7 @@ import * as flow from './js/engine/flow.js';
     turnLoopIfBot();
   }
 
-  function betForced(pid, amt, label) {
-    const p = players[pid];
-    if (p.out) return;
-    const pay = Math.min(amt, p.chips);
-    if (pay <= 0) return;
-    p.chips -= pay; p.bet += pay; p.total += pay; state.pot += pay;
-    if (p.chips === 0) p.allIn = true;
-    log(`${p.name}: ${label} ${pay}${p.allIn ? '（オールイン）' : ''}`);
-    setLastAction(p, 'blind', pay, label);
-  }
+  function betForced(pid, amt, label) { return betForcedEngine(players, state, pid, amt, label, log, setLastAction); }
 
   // アクション進行
   function nextPlayer() {
